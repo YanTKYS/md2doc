@@ -197,6 +197,8 @@ C# WinFormsツール:
       （必要に応じてその他クラス）
 ```
 
+詳細は `guides/11_non_web_tool_patterns.md` を参照する。
+
 ## 15. Markdown品質条件（作成先成果物にも適用）
 
 - 見出し、本文、箇条書き、表、チェックボックスを適切に改行する。
@@ -228,6 +230,8 @@ Markdown整形の実確認ルール:
 - `.csproj` は通常のXML構造として作成し、1行の要約文にしない。
 - 可能であれば `dotnet build` 相当でビルド確認する。未確認の場合は理由と未確認事項を報告する。
 - Office Interopを使う場合は、Office依存、プロセス残存対策、上書き確認、ログ保存禁止をREADMEや手順書に明記する。
+- Office Interop系ツールでは、Office導入確認、ライセンス、ビット数、COM例外、プロセス残留などの実機確認が必要。
+- Office Interop系ツールの詳細チェックは `guides/12_office_interop_checklist.md` を利用する。
 
 コード整形の実確認ルール:
 
@@ -258,6 +262,7 @@ wc -l src/*.html src/*.css src/*.js
 - 本書に記載の標準構成と標準成果物名を維持し、成果物を省略しない。
 - 特に `manuals/operator_manual.md` は省略しない。
 - 判断材料が不足している場合は、推測で省略せず「判断しづらかった点」として報告する。
+- Office Interopを使う場合は、上記の実機確認観点を省略しない。
 
 ## 19. 重要（推測実装の禁止）
 
