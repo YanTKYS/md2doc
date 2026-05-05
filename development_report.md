@@ -21,6 +21,7 @@
 - `docs/release_checklist.md`
 - `docs/test_scenarios.md`
 - `development_report.md`
+- `docs/tool_design.md`
 
 ## 5. 補完した内容
 
@@ -33,6 +34,7 @@
 
 - 実装機能の追加はなし（既存目的を維持）。
 - 文書面での運用・検証観点を補強。
+- C#プロジェクト構成を設計書へ明記し、guideで求める構成確認を追記。
 
 ## 7. 整形確認結果
 
