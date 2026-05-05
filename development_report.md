@@ -2,60 +2,71 @@
 
 ## 1. 今回の目的
 
-更新後の `reference/guide_context.md` に合わせて、
-既存のWinForms/Office Interop実装を活かしつつ、
-不足成果物・運用文書・確認記録を補完し、
-ガイド準拠の状態へ近づける。
+既存の WinForms / Office Interop 実装を維持したまま、
+同梱ガイド準拠（`reference/guide_context.md`、`reference/11_non_web_tool_patterns.md`、`reference/12_office_interop_checklist.md`）で
+不足していた文書補完と確認記録を明確化する。
 
-## 2. 作成したファイル
+## 2. 参照した同梱ガイド
 
-- なし（今回は既存成果物の補完・整備が中心）
+- `reference/guide_context.md`
+- `reference/11_non_web_tool_patterns.md`
+- `reference/12_office_interop_checklist.md`
 
-## 3. 更新したファイル
+## 3. 作成したファイル
 
+- なし
+
+## 4. 更新したファイル
+
+- `docs/release_checklist.md`
+- `docs/test_scenarios.md`
 - `development_report.md`
 - `docs/tool_design.md`
-- `docs/release_checklist.md`
-- `src/md2doc/MainForm.cs`
 
-## 4. 補完した内容
+## 5. 補完した内容
 
-- WinForms画面レイアウトの行定義を明確化し、
-  入力欄・実行ボタン・結果表示欄の分離を維持しやすくした。
-- Office Interop向けの注意事項を設計書とチェックリストへ追加した。
-- Officeビット数差異（32/64bit）確認をリリース前チェック項目へ追加した。
+- リリース前チェックリストを、共通項目と Office Interop 項目に分離した。
+- Office 版数・ビット数・利用者権限など、実機で必須確認すべき項目を明文化した。
+- テストシナリオに COM 例外系・連続実行時のプロセス残留確認を追加した。
+- Markdown 整形品質の自己点検欄を追加した。
 
-## 5. 実装・整形・ビルド確認
+## 6. 実装した機能
 
-- C#実装の改行・インデントを維持しつつ整備した。
-- Markdown文書群の見出し・表・チェックボックス整形を確認した。
-- `dotnet build` はこの環境で未実施（`dotnet` 非搭載）。
+- 実装機能の追加はなし（既存目的を維持）。
+- 文書面での運用・検証観点を補強。
+- C#プロジェクト構成を設計書へ明記し、guideで求める構成確認を追記。
 
-## 6. C# WinForms / Office Interop / Office変換系ツールとして確認した事項
+## 7. 整形確認結果
 
-- Word COMオブジェクト解放の必要性。
-- Word未導入・未認証・更新中の失敗ケース考慮。
-- 上書き確認ダイアログによる破壊的処理の抑止。
-- 入力本文をエラー表示へ過剰出力しない方針。
+- `docs/release_checklist.md` と `docs/test_scenarios.md` の見出し、表、チェックボックス整形を確認。
+- 行圧縮はなく、raw表示でも判読可能。
 
-## 7. 判断しづらかった点
+## 8. ビルド確認結果または未確認理由
 
-- Office Interopでの標準保証範囲（Office版差異、ビット数差異、
-  セキュリティポリシー差異）をどこまで必須確認とするか。
+- `dotnet build src/md2doc/md2doc.csproj` は未実施。
+- 理由: 本実行環境に `dotnet` がないため。
 
-## 8. `lg_toolkit_guide` 側への改善提案
+## 9. 外部依存の有無
 
-- Web標準構成とは別に、WinForms/WPFなど非Web向け成果物テンプレートの明記。
-- Office Interop向けの実機確認チェック例（Office版、32/64bit、
-  ライセンス状態、更新中挙動）をガイドに追加。
+- 既存どおり Microsoft Word（Office Interop）に依存。
+- 新規の外部ライブラリ／外部サービス依存は追加なし。
 
-## 9. 未対応事項と対応予定
+## 10. 外部通信の有無
 
-- Windows端末での実機ビルド確認。
-- Office Standard端末での変換実行確認。
-- 32/64bit端末差異の確認。
+- なし（オフライン運用前提を維持）。
 
-## 10. 今回あえて変更しなかったもの
+## 11. 個人情報保存・送信・ログ出力の有無
 
-- `src/md2doc/WordInteropConverter.cs` のMarkdown対応範囲
-  （既存目的維持のため、機能拡張は行わない）。
+- 入力本文の永続保存なし。
+- 外部送信なし。
+- 個人情報を含むログ出力機能の追加なし。
+
+## 12. 判断しづらかった点
+
+- Office 実機未確認時に、どこまでを「判定済み」と扱うかの境界。
+- 32bit / 64bit 差異検証の優先度と検証順。
+
+## 13. `lg_toolkit_guide` 側へフィードバックすべき改善点
+
+- Office Interop チェックリストに「実機未確認時の記録テンプレート（未確認理由・次アクション）」を追記すると運用しやすい。
+- 非Webツール向けに、WinFormsの典型的な運用引継ぎ記載例があると再利用性が高まる。
