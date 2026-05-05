@@ -141,9 +141,7 @@ manuals/
   user_manual.md
 
 src/
-  index.html
-  script.js
-  style.css
+  （実装方式に応じたファイルを配置）
 
 reference/
   guide_context.md
@@ -169,14 +167,37 @@ docs/operation_handover.md
 manuals/admin_manual.md
 manuals/operator_manual.md
 manuals/user_manual.md
-src/index.html
-src/script.js
-src/style.css
+src/（実装方式に応じた実装ファイル）
 ```
 
 - `docs/design.md`、`docs/checklist.md`、`docs/test.md` のような短縮名は原則使わない。
 - 開発報告書は原則として、ルート直下の `development_report.md` に作成する。
 - 同一リポジトリ内に複数の `development_report.md` を作成しない。
+- 文書成果物は上記を標準とし、実装ファイルは実装方式に応じて `src/` 配下へ配置する。
+
+実装方式別の `src/` 構成例:
+
+```text
+静的Webツール:
+  src/
+    index.html
+    script.js
+    style.css
+
+PowerShellツール:
+  src/
+    main.ps1
+
+C# WinFormsツール:
+  src/
+    <ProjectName>/
+      <ProjectName>.csproj
+      Program.cs
+      MainForm.cs
+      （必要に応じてその他クラス）
+```
+
+詳細は `guides/11_non_web_tool_patterns.md` を参照する。
 
 ## 15. Markdown品質条件（作成先成果物にも適用）
 
@@ -205,6 +226,12 @@ Markdown整形の実確認ルール:
 - `src/index.html`、`src/script.js`、`src/style.css` は、保守しやすいように適切な改行とインデントで記述する。
 - `src/script.js` や `src/style.css` を1行に圧縮しない。
 - 作成後に、raw表示相当で可読性を自己点検する。
+- `.cs` ファイルはクラス、メソッド、条件分岐ごとに改行・インデントし、1行化しない。
+- `.csproj` は通常のXML構造として作成し、1行の要約文にしない。
+- 可能であれば `dotnet build` 相当でビルド確認する。未確認の場合は理由と未確認事項を報告する。
+- Office Interopを使う場合は、Office依存、プロセス残存対策、上書き確認、ログ保存禁止をREADMEや手順書に明記する。
+- Office Interop系ツールでは、Office導入確認、ライセンス、ビット数、COM例外、プロセス残留などの実機確認が必要。
+- Office Interop系ツールの詳細チェックは `guides/12_office_interop_checklist.md` を利用する。
 
 コード整形の実確認ルール:
 
@@ -235,6 +262,7 @@ wc -l src/*.html src/*.css src/*.js
 - 本書に記載の標準構成と標準成果物名を維持し、成果物を省略しない。
 - 特に `manuals/operator_manual.md` は省略しない。
 - 判断材料が不足している場合は、推測で省略せず「判断しづらかった点」として報告する。
+- Office Interopを使う場合は、上記の実機確認観点を省略しない。
 
 ## 19. 重要（推測実装の禁止）
 
