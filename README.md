@@ -1,9 +1,9 @@
-# Markdown変換ツール（Word）
+# Markdown to Word 変換ツール
 
 ## 1. 概要
 
-Markdown形式のテキスト、またはMarkdownファイル（`.md` / `.txt`）を、
-Microsoft Word形式（`.docx`）へ変換するWinFormsツールです。
+Markdown形式のテキスト、またはMarkdownファイル（`.md` / `.txt`）を  
+Microsoft Word形式（`.docx`）へ変換する WinForms ツールです。
 
 ## 2. 目的
 
@@ -35,7 +35,7 @@ Microsoft Word形式（`.docx`）へ変換するWinFormsツールです。
 - 画像URLの取得や外部リンク先の自動参照
 - クラウド保存や外部API連携
 
-## 7. 使い方
+## 7. 使い方（基本手順）
 
 1. アプリを起動する。
 2. 入力方式（テキスト入力 / ファイル入力）を選択する。
@@ -47,10 +47,10 @@ Microsoft Word形式（`.docx`）へ変換するWinFormsツールです。
 
 ## 8. 入力データ / 出力データ
 
-- 入力:
+- 入力
   - Markdown文字列
   - Markdownファイル（`.md` / `.txt`）
-- 出力:
+- 出力
   - Wordファイル（`.docx`）
 
 ## 9. 個人情報の取扱い
@@ -71,7 +71,7 @@ Microsoft Word形式（`.docx`）へ変換するWinFormsツールです。
 dotnet build src/md2doc/md2doc.csproj
 ```
 
-- 本環境で `dotnet` がない場合は、Windows開発端末で確認する。
+- `dotnet` がない環境では、Windows開発端末で確認する。
 
 ## 12. バージョン / 更新履歴 / 既知の制約 / 保守範囲
 
@@ -85,3 +85,18 @@ dotnet build src/md2doc/md2doc.csproj
   - DX担当: ツール改修、配布、障害切り分け
   - 利用部署: 日常運用、一次確認
   - 所管部署判断: 出力文書の業務最終判断
+
+## 13. 標準成果物と配置
+
+本リポジトリは `reference/guide_context.md` の標準成果物に沿って、以下を配置しています。
+
+- `README.md`
+- `development_report.md`
+- `docs/tool_design.md`
+- `docs/release_checklist.md`
+- `docs/test_scenarios.md`
+- `docs/operation_handover.md`
+- `manuals/admin_manual.md`
+- `manuals/operator_manual.md`
+- `manuals/user_manual.md`
+- `src/md2doc/`（C# WinForms 実装）

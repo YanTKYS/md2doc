@@ -4,15 +4,32 @@ namespace Md2Doc;
 
 public sealed class MainForm : Form
 {
-    private readonly RadioButton _textInputRadio = new() { Text = "テキスト入力", Checked = true, AutoSize = true };
+    private readonly RadioButton _textInputRadio = new()
+    {
+        Text = "テキスト入力",
+        Checked = true,
+        AutoSize = true
+    };
     private readonly RadioButton _fileInputRadio = new() { Text = "ファイル入力", AutoSize = true };
-    private readonly TextBox _markdownTextBox = new() { Multiline = true, ScrollBars = ScrollBars.Both, WordWrap = false, Dock = DockStyle.Fill };
+    private readonly TextBox _markdownTextBox = new()
+    {
+        Multiline = true,
+        ScrollBars = ScrollBars.Both,
+        WordWrap = false,
+        Dock = DockStyle.Fill
+    };
     private readonly TextBox _inputFilePathTextBox = new() { Dock = DockStyle.Fill };
     private readonly Button _inputBrowseButton = new() { Text = "参照..." };
     private readonly TextBox _outputFilePathTextBox = new() { Dock = DockStyle.Fill };
     private readonly Button _outputBrowseButton = new() { Text = "参照..." };
     private readonly TextBox _fontNameTextBox = new() { Text = "MS Gothic", Width = 200 };
-    private readonly NumericUpDown _fontSizeNumeric = new() { Minimum = 8, Maximum = 72, DecimalPlaces = 1, Value = 11 };
+    private readonly NumericUpDown _fontSizeNumeric = new()
+    {
+        Minimum = 8,
+        Maximum = 72,
+        DecimalPlaces = 1,
+        Value = 11
+    };
     private readonly Button _convertButton = new() { Text = "変換実行", AutoSize = true };
     private readonly Label _resultLabel = new() { AutoSize = true };
 
@@ -136,7 +153,12 @@ public sealed class MainForm : Form
             ValidateInput(markdown, outputPath, fontName);
             EnsureOverwriteConfirmed(outputPath);
 
-            await Task.Run(() => WordInteropConverter.ConvertToDocx(markdown, outputPath, fontName, fontSize));
+            await Task.Run(
+                () => WordInteropConverter.ConvertToDocx(
+                    markdown,
+                    outputPath,
+                    fontName,
+                    fontSize));
 
             _resultLabel.Text = $"変換完了: {outputPath}";
         }

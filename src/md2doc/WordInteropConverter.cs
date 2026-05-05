@@ -14,7 +14,8 @@ internal static class WordInteropConverter
 
         try
         {
-            app = Activator.CreateInstance(wordType) ?? throw new InvalidOperationException("Wordを起動できません。");
+            app = Activator.CreateInstance(wordType)
+                ?? throw new InvalidOperationException("Wordを起動できません。");
             app.Visible = false;
             doc = app.Documents.Add();
 
