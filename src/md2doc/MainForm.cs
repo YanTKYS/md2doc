@@ -6,14 +6,14 @@ public sealed class MainForm : Form
 {
     private readonly RadioButton _textInputRadio = new() { Text = "テキスト入力", Checked = true, AutoSize = true };
     private readonly RadioButton _fileInputRadio = new() { Text = "ファイル入力", AutoSize = true };
-    private readonly TextBox _markdownTextBox = new() { Multiline = true, ScrollBars = ScrollBars.Both, WordWrap = false };
-    private readonly TextBox _inputFilePathTextBox = new();
+    private readonly TextBox _markdownTextBox = new() { Multiline = true, ScrollBars = ScrollBars.Both, WordWrap = false, Dock = DockStyle.Fill };
+    private readonly TextBox _inputFilePathTextBox = new() { Dock = DockStyle.Fill };
     private readonly Button _inputBrowseButton = new() { Text = "参照..." };
-    private readonly TextBox _outputFilePathTextBox = new();
+    private readonly TextBox _outputFilePathTextBox = new() { Dock = DockStyle.Fill };
     private readonly Button _outputBrowseButton = new() { Text = "参照..." };
-    private readonly TextBox _fontNameTextBox = new() { Text = "MS Gothic" };
+    private readonly TextBox _fontNameTextBox = new() { Text = "MS Gothic", Width = 200 };
     private readonly NumericUpDown _fontSizeNumeric = new() { Minimum = 8, Maximum = 72, DecimalPlaces = 1, Value = 11 };
-    private readonly Button _convertButton = new() { Text = "変換実行" };
+    private readonly Button _convertButton = new() { Text = "変換実行", AutoSize = true };
     private readonly Label _resultLabel = new() { AutoSize = true };
 
     public MainForm()
@@ -26,10 +26,20 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 6,
+            RowCount = 11,
             Padding = new Padding(10),
-            AutoSize = true,
         };
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         var inputModePanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
         inputModePanel.Controls.Add(_textInputRadio);
@@ -50,7 +60,6 @@ public sealed class MainForm : Form
         var fontPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
         fontPanel.Controls.Add(new Label { Text = "フォント名:" });
         fontPanel.Controls.Add(_fontNameTextBox);
-        _fontNameTextBox.Width = 200;
         fontPanel.Controls.Add(new Label { Text = "フォントサイズ:" });
         fontPanel.Controls.Add(_fontSizeNumeric);
 
