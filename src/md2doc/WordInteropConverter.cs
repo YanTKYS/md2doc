@@ -30,7 +30,7 @@ internal static class WordInteropConverter
             doc.Content.Font.Name = fontName;
             doc.Content.Font.Size = fontSize;
 
-            doc.SaveAs2(outputPath);
+            doc.SaveAs2(outputPath, 12); // 12 = wdFormatXMLDocument (.docx)
         }
         finally
         {
@@ -51,26 +51,32 @@ internal static class WordInteropConverter
     private static void WriteMarkdown(dynamic doc, string markdown)
     {
         var lines = markdown.Replace("\r\n", "\n").Split('\n');
+        bool firstParagraphUsed = false;
 
         foreach (var rawLine in lines)
         {
             var line = rawLine.TrimEnd();
             if (string.IsNullOrWhiteSpace(line))
             {
-                doc.Paragraphs.Add();
+                if (firstParagraphUsed)
+                {
+                    doc.Paragraphs.Add();
+                }
                 continue;
             }
 
-            if (TryHeading(doc, line) || TryBullet(doc, line))
+            // 新規ドキュメントの最初の空段落を再利用することで先頭の余分な空行を防ぐ
+            dynamic para = firstParagraphUsed ? doc.Paragraphs.Add() : doc.Paragraphs[1];
+            firstParagraphUsed = true;
+
+            if (!TryHeading(para, line) && !TryBullet(para, line))
             {
-                continue;
+                WriteParagraph(para, ParseInline(line));
             }
-
-            WriteParagraph(doc, ParseInline(line));
         }
     }
 
-    private static bool TryHeading(dynamic doc, string line)
+    private static bool TryHeading(dynamic para, string line)
     {
         var match = HeadingPattern.Match(line);
         if (!match.Success)
@@ -79,15 +85,12 @@ internal static class WordInteropConverter
         }
 
         var level = match.Groups[1].Value.Length;
-        var text = ParseInline(match.Groups[2].Value);
-        var para = doc.Paragraphs.Add();
-        para.Range.Text = text;
+        para.Range.Text = ParseInline(match.Groups[2].Value);
         para.Range.set_Style($"Heading {Math.Min(level, 3)}");
-        para.Range.InsertParagraphAfter();
         return true;
     }
 
-    private static bool TryBullet(dynamic doc, string line)
+    private static bool TryBullet(dynamic para, string line)
     {
         var match = BulletPattern.Match(line);
         if (!match.Success)
@@ -95,19 +98,14 @@ internal static class WordInteropConverter
             return false;
         }
 
-        var text = ParseInline(match.Groups[1].Value);
-        var para = doc.Paragraphs.Add();
-        para.Range.Text = text;
+        para.Range.Text = ParseInline(match.Groups[1].Value);
         para.Range.ListFormat.ApplyBulletDefault();
-        para.Range.InsertParagraphAfter();
         return true;
     }
 
-    private static void WriteParagraph(dynamic doc, string text)
+    private static void WriteParagraph(dynamic para, string text)
     {
-        var para = doc.Paragraphs.Add();
         para.Range.Text = text;
-        para.Range.InsertParagraphAfter();
     }
 
     private static string ParseInline(string text)
