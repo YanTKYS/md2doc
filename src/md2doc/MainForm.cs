@@ -94,8 +94,8 @@ public sealed class MainForm : Form
 
         Controls.Add(root);
 
-        _textInputRadio.CheckedChanged += (_, _) => RefreshInputMode();
-        _fileInputRadio.CheckedChanged += (_, _) => RefreshInputMode();
+        _textInputRadio.CheckedChanged += (_, _) => { if (_textInputRadio.Checked) RefreshInputMode(); };
+        _fileInputRadio.CheckedChanged += (_, _) => { if (_fileInputRadio.Checked) RefreshInputMode(); };
         _inputBrowseButton.Click += (_, _) => BrowseInputFile();
         _outputBrowseButton.Click += (_, _) => BrowseOutputFile();
         _convertButton.Click += async (_, _) => await ConvertAsync();
@@ -151,7 +151,12 @@ public sealed class MainForm : Form
             var fontSize = (double)_fontSizeNumeric.Value;
 
             ValidateInput(markdown, outputPath, fontName);
-            EnsureOverwriteConfirmed(outputPath);
+
+            if (!ConfirmOverwrite(outputPath))
+            {
+                _resultLabel.Text = "変換をキャンセルしました。";
+                return;
+            }
 
             await Task.Run(
                 () => WordInteropConverter.ConvertToDocx(
@@ -217,11 +222,11 @@ public sealed class MainForm : Form
         }
     }
 
-    private void EnsureOverwriteConfirmed(string outputPath)
+    private bool ConfirmOverwrite(string outputPath)
     {
         if (!File.Exists(outputPath))
         {
-            return;
+            return true;
         }
 
         var result = MessageBox.Show(
@@ -231,9 +236,6 @@ public sealed class MainForm : Form
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Warning);
 
-        if (result != DialogResult.Yes)
-        {
-            throw new InvalidOperationException("上書きがキャンセルされました。");
-        }
+        return result == DialogResult.Yes;
     }
 }
