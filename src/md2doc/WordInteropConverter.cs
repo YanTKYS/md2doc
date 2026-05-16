@@ -4,6 +4,12 @@ namespace Md2Doc;
 
 internal static class WordInteropConverter
 {
+    private static readonly Regex HeadingPattern = new(@"^(#{1,6})\s+(.+)$", RegexOptions.Compiled);
+    private static readonly Regex BulletPattern = new(@"^[-*]\s+(.+)$", RegexOptions.Compiled);
+    private static readonly Regex BoldPattern = new(@"\*\*(.+?)\*\*", RegexOptions.Compiled);
+    private static readonly Regex ItalicPattern = new(@"\*(.+?)\*", RegexOptions.Compiled);
+    private static readonly Regex CodePattern = new(@"`(.+?)`", RegexOptions.Compiled);
+
     public static void ConvertToDocx(string markdown, string outputPath, string fontName, double fontSize)
     {
         var wordType = Type.GetTypeFromProgID("Word.Application")
@@ -51,7 +57,7 @@ internal static class WordInteropConverter
             var line = rawLine.TrimEnd();
             if (string.IsNullOrWhiteSpace(line))
             {
-                doc.Content.InsertAfter("\n");
+                doc.Paragraphs.Add();
                 continue;
             }
 
@@ -66,7 +72,7 @@ internal static class WordInteropConverter
 
     private static bool TryHeading(dynamic doc, string line)
     {
-        var match = Regex.Match(line, "^(#{1,6})\\s+(.+)$");
+        var match = HeadingPattern.Match(line);
         if (!match.Success)
         {
             return false;
@@ -83,12 +89,13 @@ internal static class WordInteropConverter
 
     private static bool TryBullet(dynamic doc, string line)
     {
-        if (!Regex.IsMatch(line, "^[-*]\\s+.+$"))
+        var match = BulletPattern.Match(line);
+        if (!match.Success)
         {
             return false;
         }
 
-        var text = ParseInline(Regex.Replace(line, "^[-*]\\s+", string.Empty));
+        var text = ParseInline(match.Groups[1].Value);
         var para = doc.Paragraphs.Add();
         para.Range.Text = text;
         para.Range.ListFormat.ApplyBulletDefault();
@@ -105,10 +112,9 @@ internal static class WordInteropConverter
 
     private static string ParseInline(string text)
     {
-        var result = text;
-        result = Regex.Replace(result, "\\*\\*(.+?)\\*\\*", "$1");
-        result = Regex.Replace(result, "\\*(.+?)\\*", "$1");
-        result = Regex.Replace(result, "`(.+?)`", "$1");
+        var result = BoldPattern.Replace(text, "$1");
+        result = ItalicPattern.Replace(result, "$1");
+        result = CodePattern.Replace(result, "$1");
         return result;
     }
 }
