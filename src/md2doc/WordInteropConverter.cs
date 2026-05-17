@@ -243,21 +243,28 @@ internal static class WordInteropConverter
                     para.Range.Style = -(block.HeadingLevel + 1);
                     break;
                 case BlockKind.Bullet:
-                    para.Range.ListFormat.ApplyBulletDefault();
+                    // -47 = wdStyleListBullet。ApplyBulletDefault() と異なりトグルではなく確定的な設定
+                    para.Range.Style = -47;
                     para.Range.Font.Name = bodyFontName;
                     para.Range.Font.Size = bodyFontSize;
                     break;
                 case BlockKind.Paragraph:
+                    // -1 = wdStyleNormal。隣接箇条書きからの自動伝播リスト書式を上書きする
+                    para.Range.Style = -1;
                     para.Range.Font.Name = bodyFontName;
                     para.Range.Font.Size = bodyFontSize;
                     break;
+                case BlockKind.Empty:
+                    // wdStyleNormal で自動伝播リスト書式を除去（余分な箇条書き記号の防止）
+                    para.Range.Style = -1;
+                    break;
                 case BlockKind.Hr:
+                    para.Range.Style = -1;
                     // -3 = wdBorderBottom, 1 = wdLineStyleSingle
                     para.Borders[-3].LineStyle = 1;
                     break;
                 case BlockKind.PageBreak:
-                case BlockKind.Empty:
-                    // 段落テキストのみで成立（追加書式不要）
+                    // \f で段落テキストが設定済み、追加書式不要
                     break;
             }
 
