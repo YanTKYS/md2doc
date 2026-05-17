@@ -14,6 +14,7 @@ public sealed class MainForm : Form
     {
         Multiline = true, ScrollBars = ScrollBars.Both, WordWrap = false, Dock = DockStyle.Fill
     };
+    private readonly Button _clearButton = new() { Text = "クリア", AutoSize = true };
 
     // ファイル入力
     private readonly TextBox _inputFilePathTextBox = new() { Dock = DockStyle.Fill };
@@ -91,7 +92,7 @@ public sealed class MainForm : Form
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 入力方式 label
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // inputModePanel
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // Markdown本文 label
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // Markdown本文 label + clearButton
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // markdownTextBox
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 入力ファイル label
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // inputFilePanel
@@ -105,6 +106,10 @@ public sealed class MainForm : Form
         var inputModePanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
         inputModePanel.Controls.Add(_textInputRadio);
         inputModePanel.Controls.Add(_fileInputRadio);
+
+        var mdLabelPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
+        mdLabelPanel.Controls.Add(new Label { Text = "Markdown本文（テキスト入力）", AutoSize = true });
+        mdLabelPanel.Controls.Add(_clearButton);
 
         var inputFilePanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
         inputFilePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -120,7 +125,7 @@ public sealed class MainForm : Form
 
         root.Controls.Add(new Label { Text = "入力方式", AutoSize = true });
         root.Controls.Add(inputModePanel);
-        root.Controls.Add(new Label { Text = "Markdown本文（テキスト入力）", AutoSize = true });
+        root.Controls.Add(mdLabelPanel);
         root.Controls.Add(_markdownTextBox);
         root.Controls.Add(new Label { Text = "入力ファイル（ファイル入力）", AutoSize = true });
         root.Controls.Add(inputFilePanel);
@@ -135,6 +140,7 @@ public sealed class MainForm : Form
 
         _textInputRadio.CheckedChanged += (_, _) => { if (_textInputRadio.Checked) RefreshInputMode(); };
         _fileInputRadio.CheckedChanged += (_, _) => { if (_fileInputRadio.Checked) RefreshInputMode(); };
+        _clearButton.Click += (_, _) => _markdownTextBox.Clear();
         _inputBrowseButton.Click += (_, _) => BrowseInputFile();
         _outputBrowseButton.Click += (_, _) => BrowseOutputFile();
         _headerNoneRadio.CheckedChanged += (_, _) => { if (_headerNoneRadio.Checked) RefreshHeaderMode(); };
@@ -152,35 +158,43 @@ public sealed class MainForm : Form
 
     private GroupBox BuildFontGroupBox()
     {
-        // 2つのコンボボックスを1つのパネルにまとめて4列構成にする
-        var headingFontPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
-        headingFontPanel.Controls.Add(_headingRecentFontCombo);
-        headingFontPanel.Controls.Add(_headingFontCombo);
+        // ラベルを固定幅・固定高さにすることで FlowLayoutPanel 内でコンボと縦位置を揃える
+        const int LabelWidth = 50;
+        const int SizeLabelWidth = 74;
+        const int RowHeight = 24;
 
-        var bodyFontPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
-        bodyFontPanel.Controls.Add(_bodyRecentFontCombo);
-        bodyFontPanel.Controls.Add(_bodyFontCombo);
+        static Label RowLabel(string text, int width) => new()
+        {
+            Text = text, Width = width, Height = RowHeight,
+            AutoSize = false, TextAlign = ContentAlignment.MiddleLeft,
+        };
 
-        var table = new TableLayoutPanel { ColumnCount = 4, RowCount = 2, AutoSize = true };
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var headingRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        headingRow.Controls.Add(RowLabel("見出し:", LabelWidth));
+        headingRow.Controls.Add(_headingRecentFontCombo);
+        headingRow.Controls.Add(_headingFontCombo);
+        headingRow.Controls.Add(RowLabel("サイズ(pt):", SizeLabelWidth));
+        headingRow.Controls.Add(_headingFontSizeNumeric);
 
-        table.Controls.Add(new Label { Text = "見出し:", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
-        table.Controls.Add(headingFontPanel, 1, 0);
-        table.Controls.Add(new Label { Text = "サイズ(pt):", AutoSize = true, Anchor = AnchorStyles.Left }, 2, 0);
-        table.Controls.Add(_headingFontSizeNumeric, 3, 0);
+        var bodyRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        bodyRow.Controls.Add(RowLabel("本文:", LabelWidth));
+        bodyRow.Controls.Add(_bodyRecentFontCombo);
+        bodyRow.Controls.Add(_bodyFontCombo);
+        bodyRow.Controls.Add(RowLabel("サイズ(pt):", SizeLabelWidth));
+        bodyRow.Controls.Add(_bodyFontSizeNumeric);
 
-        table.Controls.Add(new Label { Text = "本文:", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
-        table.Controls.Add(bodyFontPanel, 1, 1);
-        table.Controls.Add(new Label { Text = "サイズ(pt):", AutoSize = true, Anchor = AnchorStyles.Left }, 2, 1);
-        table.Controls.Add(_bodyFontSizeNumeric, 3, 1);
+        // 1列2行の TableLayoutPanel でヘッダーとボディ行を縦積みする
+        var stack = new TableLayoutPanel
+        {
+            ColumnCount = 1, RowCount = 2, AutoSize = true, Margin = Padding.Empty
+        };
+        stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stack.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stack.Controls.Add(headingRow, 0, 0);
+        stack.Controls.Add(bodyRow, 0, 1);
 
         var box = new GroupBox { Text = "フォント設定", Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(6) };
-        box.Controls.Add(table);
+        box.Controls.Add(stack);
         return box;
     }
 
@@ -196,19 +210,17 @@ public sealed class MainForm : Form
         footerAlignPanel.Controls.Add(_footerAlignCenterRadio);
         footerAlignPanel.Controls.Add(_footerAlignRightRadio);
 
-        // ヘッダー行：内容選択 + 配置選択を横並びにまとめる
         var headerRowPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
         headerRowPanel.Controls.Add(_headerNoneRadio);
         headerRowPanel.Controls.Add(_headerFileNameRadio);
         headerRowPanel.Controls.Add(_headerCustomRadio);
         headerRowPanel.Controls.Add(_headerCustomTextBox);
-        headerRowPanel.Controls.Add(new Label { Text = "  ", AutoSize = true }); // spacer
+        headerRowPanel.Controls.Add(new Label { Text = "  ", AutoSize = true });
         headerRowPanel.Controls.Add(headerAlignPanel);
 
-        // フッター行：内容選択 + 配置選択を横並びにまとめる
         var footerRowPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
         footerRowPanel.Controls.Add(_footerPageNumberCheck);
-        footerRowPanel.Controls.Add(new Label { Text = "  ", AutoSize = true }); // spacer
+        footerRowPanel.Controls.Add(new Label { Text = "  ", AutoSize = true });
         footerRowPanel.Controls.Add(footerAlignPanel);
 
         var table = new TableLayoutPanel { ColumnCount = 2, RowCount = 2, AutoSize = true };
@@ -275,6 +287,7 @@ public sealed class MainForm : Form
     {
         var useText = _textInputRadio.Checked;
         _markdownTextBox.Enabled = useText;
+        _clearButton.Enabled = useText;
         _inputFilePathTextBox.Enabled = !useText;
         _inputBrowseButton.Enabled = !useText;
         _headerFileNameRadio.Enabled = !useText;
@@ -313,7 +326,7 @@ public sealed class MainForm : Form
         try
         {
             _convertButton.Enabled = false;
-            _resultLabel.Text = "変換中...";
+            _resultLabel.Text = "変換中... 0%";
 
             var markdown = GetMarkdownInput();
             var outputPath = _outputFilePathTextBox.Text.Trim();
@@ -334,12 +347,15 @@ public sealed class MainForm : Form
                 return;
             }
 
+            var progress = new Progress<int>(pct => _resultLabel.Text = $"変換中... {pct}%");
+
             await Task.Run(() => WordInteropConverter.ConvertToDocx(
                 markdown, outputPath,
                 headingFontName, headingFontSize,
                 bodyFontName, bodyFontSize,
                 headerText, headerAlignment,
-                addPageNumbers, footerAlignment));
+                addPageNumbers, footerAlignment,
+                progress));
 
             var history = FontHistory.Update(headingFontName, bodyFontName);
             PopulateRecentFontCombo(_headingRecentFontCombo, history);
