@@ -112,10 +112,27 @@ internal static class WordInteropConverter
         var lines = markdown.Replace("\r\n", "\n").Split('\n');
         int total = Math.Max(lines.Length, 1);
         bool firstParagraphUsed = false;
+        int i = 0;
 
-        for (int i = 0; i < lines.Length; i++)
+        while (i < lines.Length)
         {
             var line = lines[i].TrimEnd();
+
+            // テーブルブロックの検出：連続する | 行をまとめて処理
+            if (IsTableLine(line))
+            {
+                var tableLines = new List<string>();
+                while (i < lines.Length && IsTableLine(lines[i].TrimEnd()))
+                {
+                    tableLines.Add(lines[i].TrimEnd());
+                    i++;
+                }
+                if (TryTable(doc, tableLines, bodyFontName, bodyFontSize, firstParagraphUsed))
+                    firstParagraphUsed = true;
+                progress?.Report(10 + i * 70 / total);
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(line))
             {
                 if (firstParagraphUsed)
@@ -136,7 +153,56 @@ internal static class WordInteropConverter
 
             // 10%→80% の範囲で行ごとに進捗報告
             progress?.Report(10 + (i + 1) * 70 / total);
+            i++;
         }
+    }
+
+    private static bool IsTableLine(string line)
+    {
+        var t = line.Trim();
+        return t.Length > 2 && t.StartsWith("|") && t.EndsWith("|");
+    }
+
+    private static bool IsTableSeparator(string line) =>
+        line.All(c => c is '-' or ':' or '|' or ' ');
+
+    private static List<string> ParseTableRow(string line)
+    {
+        var parts = line.Split('|');
+        return parts.Length < 2 ? [] : parts[1..^1].Select(p => p.Trim()).ToList();
+    }
+
+    private static bool TryTable(
+        dynamic doc, List<string> tableLines,
+        string fontName, double fontSize, bool firstParagraphUsed)
+    {
+        bool hasSeparator = tableLines.Any(IsTableSeparator);
+        var dataRows = tableLines.Where(l => !IsTableSeparator(l)).ToList();
+        if (dataRows.Count == 0) return false;
+
+        var colCount = ParseTableRow(dataRows[0]).Count;
+        if (colCount == 0) return false;
+
+        dynamic anchorPara = firstParagraphUsed ? doc.Paragraphs.Add() : doc.Paragraphs[1];
+        dynamic table = doc.Tables.Add(anchorPara.Range, dataRows.Count, colCount);
+        table.Borders.Enable = 1;
+
+        for (int r = 0; r < dataRows.Count; r++)
+        {
+            var cells = ParseTableRow(dataRows[r]);
+            for (int c = 0; c < Math.Min(cells.Count, colCount); c++)
+            {
+                var cell = table.Cell(r + 1, c + 1);
+                cell.Range.Text = ParseInline(cells[c]);
+                cell.Range.Font.Name = fontName;
+                cell.Range.Font.Size = fontSize;
+                // 区切り行がある場合は先頭行をヘッダーとして太字にする
+                if (hasSeparator && r == 0)
+                    cell.Range.Font.Bold = 1;
+            }
+        }
+
+        return true;
     }
 
     private static bool TryHeading(dynamic para, string line, string fontName, double fontSize)
