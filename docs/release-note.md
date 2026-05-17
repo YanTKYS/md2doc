@@ -1,5 +1,32 @@
 # Release Notes
 
+## v0.4.0
+
+title: docx XML 検査による回帰テスト基盤の追加
+
+### 変更内容
+
+- テストプロジェクト `tests/Md2Doc.Tests/` を新規追加（xUnit、`net8.0-windows`）
+- `MarkdownParser` を `WordInteropConverter` から分離し、Word COM 不要の単体テストを可能に
+  - `ParseBlocks` / `Block` / `BlockKind` を `MarkdownParser.cs` に移動
+- 単体テスト `ParseBlocksTests`: Word なしで実行可能（8 テスト）
+- 統合テスト `DocxConversionTests`: `.docx` を ZIP 展開して `word/document.xml` を直接検査
+  - Word がない環境では自動スキップ
+  - 段落消失・箇条書き交互消失・テーブル前後の箇条書き消失を自動検出（5 テスト）
+- `DocxInspector` ヘルパー: Word COM 不要、`System.IO.Compression` のみで動作
+
+### 対象外（実装しない）
+
+- 箇条書き安定モード（記号 + インデント方式）
+- 順序付きリスト対応
+- Parser / Model / Renderer の大規模分離
+- UI 変更
+
+### 既知の制約
+
+- v0.3.0 の制約をすべて引き継ぐ
+- 統合テストは Windows + Microsoft Word がインストールされた環境でのみ実行可能
+
 ## v0.3.0
 
 title: 見出しスタイル・番号付与・改ページ対応

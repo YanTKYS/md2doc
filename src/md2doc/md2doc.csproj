@@ -7,4 +7,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>Md2Doc.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>

@@ -3,7 +3,7 @@
 ## 1. 前提
 
 - 対象: WinForms版 Markdown変換ツール（Word）
-- 版: v0.1.1（検証版）
+- 最終更新: v0.4.0
 - 補足: この環境ではWindows/Office実機確認ができないため、実機検証項目を分離して記録する。
 
 ## 2. テストケース一覧
@@ -29,8 +29,55 @@
 - [x] チェック項目は `- [ ]` / `- [x]` で統一した。
 - [x] 1行圧縮表記がないことを確認した。
 
-## 4. 実行確認結果記録
+## 4. 自動テスト（v0.4.0 追加）
+
+### テストプロジェクト
+
+`tests/Md2Doc.Tests/` （xUnit、`net8.0-windows`、`dotnet test` で実行）
+
+### 単体テスト: ParseBlocksTests
+
+Word COM 不要。`MarkdownParser.ParseBlocks` の純粋関数テスト。
+
+| テスト名 | 検証内容 |
+|----------|----------|
+| `ParseBlocks_RegressionMarkdown_AllBlocksPresent` | 必須 Markdown 全 8 ブロックが正しく解析される |
+| `ParseBlocks_NoBulletsLost_ConsecutiveBullets` | 4 連続箇条書きが欠落なく解析される |
+| `ParseBlocks_HeadingFollowedByBullet_BulletNotLost` | 見出し直後の箇条書きが消えない |
+| `ParseBlocks_ParagraphAfterBullet_ParagraphNotLost` | 箇条書き後の通常段落が消えない |
+| `ParseBlocks_NumberHeadings_PrefixAdded` | 見出し番号が正しく付与される |
+| `ParseBlocks_PageBreak_DetectedCorrectly` | 改ページ記法が検出される |
+| `ParseBlocks_Table_ParsedCorrectly` | テーブルが正しく解析される |
+| `ParseBlocks_InlineMarkup_Stripped` | インライン記法が除去される |
+
+### 統合テスト: DocxConversionTests
+
+**Windows + Microsoft Word が必要。** 未インストール環境ではスキップ。
+`.docx` を展開し `word/document.xml` を直接検査する。
+
+| テスト名 | 検証内容 |
+|----------|----------|
+| `Regression_AllTextPresentInOrder` | 必須 Markdown の全テキストが順序通り存在する（段落消失・交互消失・通常段落消失を一括検出） |
+| `Regression_NoBulletAlternatingLoss` | 4 連続箇条書きが奇数/偶数行だけに減らない |
+| `Regression_ParagraphAfterBulletNotLost` | 箇条書き後の通常段落が消えない |
+| `Regression_BulletsAroundTable` | テーブル前後の箇条書きが消えない |
+| `Regression_NumberedHeadings_TextPresent` | 番号付き見出し有効時に全テキストが存在する |
+
+### 実行方法
+
+```
+dotnet test tests/Md2Doc.Tests/Md2Doc.Tests.csproj
+```
+
+### 検査手法
+
+`DocxInspector.ExtractParagraphTexts()` が `word/document.xml` の `<w:p>` ごとに
+`<w:t>` を結合して段落テキスト一覧を返す。
+`DocxInspector.VerifyOrder()` が期待テキストの存在と順序を検証する。
+
+## 5. 実行確認結果記録
 
 - この実行環境では `dotnet` が存在せず、`dotnet build` は未実施。
 - この実行環境では Windows / Office がないため、Interop実行確認は未実施。
 - 実機確認は、Windows + Office導入済み端末で実施する。
+- ParseBlocksTests は Word 不要のため、Windows でなくても `dotnet test` で実行可能。
