@@ -302,10 +302,7 @@ public sealed class MainForm : Form
             {
                 recentCombo.Items.Add(RecentFontPlaceholder);
                 recentCombo.Items.AddRange(valid.ToArray<object>());
-                var current = mainCombo.SelectedItem as string;
-                var idx = current is not null ? valid.IndexOf(current) : -1;
-                // 一致する履歴があればその行を選択、なければプレースホルダーを表示
-                recentCombo.SelectedIndex = idx >= 0 ? idx + 1 : 0;
+                recentCombo.SelectedIndex = 0;
                 recentCombo.Enabled = true;
             }
         }
