@@ -127,7 +127,7 @@ public class OpenXmlConverterTests : IDisposable
     [Fact]
     public void PageBreak_DashSyntax_BothSidesPreserved()
     {
-        const string md = "前の段落\n---pagebreak---\n後の段落";
+        const string md = "前の段落\n\n---pagebreak---\n\n後の段落";
         var path = TempDocx();
         Convert(md, path);
 
