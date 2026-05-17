@@ -50,14 +50,17 @@ internal static class WordInteropConverter
         }
         finally
         {
+            // Close/Quit を個別の try-catch で保護し、例外が出ても必ず FinalReleaseComObject を実行する
             if (doc is not null)
             {
-                doc.Close(false);
+                try { doc.Close(false); }
+                catch (Exception ex) { AppLog.Error("doc.Close 失敗", ex); }
                 System.Runtime.InteropServices.Marshal.FinalReleaseComObject(doc);
             }
             if (app is not null)
             {
-                app.Quit(false);
+                try { app.Quit(false); }
+                catch (Exception ex) { AppLog.Error("app.Quit 失敗", ex); }
                 System.Runtime.InteropServices.Marshal.FinalReleaseComObject(app);
             }
         }
