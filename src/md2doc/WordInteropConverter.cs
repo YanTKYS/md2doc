@@ -228,6 +228,8 @@ internal static class WordInteropConverter
         IProgress<int>? progress)
     {
         int total = Math.Max(blocks.Count, 1);
+
+        // パス 1: 各ブロックの段落スタイル・フォントを適用
         for (int i = 0; i < blocks.Count; i++)
         {
             var block = blocks[i];
@@ -249,13 +251,11 @@ internal static class WordInteropConverter
                     para.Range.Font.Size = bodyFontSize;
                     break;
                 case BlockKind.Paragraph:
-                    // -1 = wdStyleNormal。隣接箇条書きからの自動伝播リスト書式を上書きする
-                    para.Range.Style = -1;
+                    para.Range.Style = -1; // wdStyleNormal
                     para.Range.Font.Name = bodyFontName;
                     para.Range.Font.Size = bodyFontSize;
                     break;
                 case BlockKind.Empty:
-                    // wdStyleNormal で自動伝播リスト書式を除去（余分な箇条書き記号の防止）
                     para.Range.Style = -1;
                     break;
                 case BlockKind.Hr:
@@ -268,7 +268,32 @@ internal static class WordInteropConverter
                     break;
             }
 
-            progress?.Report(40 + (i + 1) * 30 / total);
+            progress?.Report(40 + (i + 1) * 20 / total);
+        }
+
+        // パス 2: 隣接箇条書きから自動伝播したリスト書式を非箇条書き段落から除去
+        // Word は ApplyBulletDefault/wdStyleListBullet の適用時に隣接段落へ
+        // リスト書式を直接適用形式で伝播することがあり、Style 設定だけでは消えない。
+        // パス 1 完了後に一括除去することで、順方向/逆方向どちらの伝播も確実に拾う。
+        for (int i = 0; i < blocks.Count; i++)
+        {
+            var block = blocks[i];
+            if (block.Kind is BlockKind.Bullet or BlockKind.Table or BlockKind.PageBreak)
+                continue;
+
+            try
+            {
+                dynamic para = doc.Paragraphs[i + 1];
+                // 0 = wdListNoNumbering。既にリスト書式が無ければ何もしない
+                if ((int)para.Range.ListFormat.ListType != 0)
+                    para.Range.ListFormat.RemoveNumbers();
+            }
+            catch (Exception ex)
+            {
+                AppLog.Error($"リスト書式の除去失敗 block[{i}]={block.Kind}", ex);
+            }
+
+            progress?.Report(60 + (i + 1) * 10 / total);
         }
     }
 
