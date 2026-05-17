@@ -67,6 +67,9 @@ jobs:
       - name: Publish
         run: dotnet publish src/md2doc/md2doc.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=none -o publish
 
+      - name: Build tests
+        run: dotnet build tests/Md2Doc.Tests/Md2Doc.Tests.csproj -c Release
+
       - name: Create zip
         id: zip
         shell: pwsh
@@ -86,6 +89,16 @@ jobs:
             New-Item -ItemType Directory -Path "$stagingDir/bin" -Force | Out-Null
             $others | Copy-Item -Destination "$stagingDir/bin/"
           }
+
+          # テスト DLL 一式を tests/ へ配置
+          $testBuildDir = "tests/Md2Doc.Tests/bin/Release/net8.0-windows"
+          if (Test-Path $testBuildDir) {
+            New-Item -ItemType Directory -Path "$stagingDir/tests" -Force | Out-Null
+            Copy-Item "$testBuildDir/*" "$stagingDir/tests/" -Recurse
+          }
+
+          # テスト実行スクリプトをルートへ配置
+          Copy-Item "scripts/Run-IntegrationTests.ps1" "$stagingDir/Run-IntegrationTests.ps1"
 
           Compress-Archive -Path "$stagingDir/*" -DestinationPath $zipName
 
