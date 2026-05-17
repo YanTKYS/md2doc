@@ -24,28 +24,41 @@ public sealed class MainForm : Form
     private readonly Button _outputBrowseButton = new() { Text = "参照..." };
 
     // フォント（見出し / 本文）
+    private readonly string[] _allFonts;
+    private readonly ComboBox _headingRecentFontCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
     private readonly ComboBox _headingFontCombo;
     private readonly NumericUpDown _headingFontSizeNumeric = new()
     {
         Minimum = 8, Maximum = 72, DecimalPlaces = 1, Value = 14, Width = 70
     };
+    private readonly ComboBox _bodyRecentFontCombo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
     private readonly ComboBox _bodyFontCombo;
     private readonly NumericUpDown _bodyFontSizeNumeric = new()
     {
         Minimum = 8, Maximum = 72, DecimalPlaces = 1, Value = 11, Width = 70
     };
 
-    // ヘッダー
+    // ヘッダー内容
     private readonly RadioButton _headerNoneRadio = new() { Text = "なし", Checked = true, AutoSize = true };
     private readonly RadioButton _headerFileNameRadio = new() { Text = "元ファイル名", AutoSize = true };
     private readonly RadioButton _headerCustomRadio = new() { Text = "自由記入:", AutoSize = true };
     private readonly TextBox _headerCustomTextBox = new() { Width = 220, Enabled = false };
 
-    // フッター
+    // ヘッダー配置
+    private readonly RadioButton _headerAlignLeftRadio = new() { Text = "左寄り", Checked = true, AutoSize = true };
+    private readonly RadioButton _headerAlignCenterRadio = new() { Text = "中央", AutoSize = true };
+    private readonly RadioButton _headerAlignRightRadio = new() { Text = "右寄り", AutoSize = true };
+
+    // フッター内容
     private readonly CheckBox _footerPageNumberCheck = new()
     {
         Text = "ページ番号を挿入（ページ番号/ページ数）", AutoSize = true
     };
+
+    // フッター配置
+    private readonly RadioButton _footerAlignLeftRadio = new() { Text = "左寄り", AutoSize = true };
+    private readonly RadioButton _footerAlignCenterRadio = new() { Text = "中央", Checked = true, AutoSize = true };
+    private readonly RadioButton _footerAlignRightRadio = new() { Text = "右寄り", AutoSize = true };
 
     // 実行・結果
     private readonly Button _convertButton = new() { Text = "変換実行", AutoSize = true };
@@ -57,8 +70,17 @@ public sealed class MainForm : Form
         Width = 960;
         Height = 800;
 
+        _allFonts = FontFamily.Families
+            .Select(f => f.Name)
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
         _headingFontCombo = CreateFontComboBox("MS Gothic");
         _bodyFontCombo = CreateFontComboBox("MS Gothic");
+
+        var history = FontHistory.Load();
+        PopulateRecentFontCombo(_headingRecentFontCombo, history);
+        PopulateRecentFontCombo(_bodyRecentFontCombo, history);
 
         var root = new TableLayoutPanel
         {
@@ -118,29 +140,36 @@ public sealed class MainForm : Form
         _headerNoneRadio.CheckedChanged += (_, _) => { if (_headerNoneRadio.Checked) RefreshHeaderMode(); };
         _headerFileNameRadio.CheckedChanged += (_, _) => { if (_headerFileNameRadio.Checked) RefreshHeaderMode(); };
         _headerCustomRadio.CheckedChanged += (_, _) => { if (_headerCustomRadio.Checked) RefreshHeaderMode(); };
+        _headingRecentFontCombo.SelectedIndexChanged += (_, _) => SyncRecentToMain(_headingRecentFontCombo, _headingFontCombo);
+        _bodyRecentFontCombo.SelectedIndexChanged += (_, _) => SyncRecentToMain(_bodyRecentFontCombo, _bodyFontCombo);
         _convertButton.Click += async (_, _) => await ConvertAsync();
 
         RefreshInputMode();
         RefreshHeaderMode();
+        SyncRecentToMain(_headingRecentFontCombo, _headingFontCombo);
+        SyncRecentToMain(_bodyRecentFontCombo, _bodyFontCombo);
     }
 
     private GroupBox BuildFontGroupBox()
     {
-        var table = new TableLayoutPanel { ColumnCount = 4, AutoSize = true };
+        var table = new TableLayoutPanel { ColumnCount = 5, AutoSize = true };
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
         table.Controls.Add(new Label { Text = "見出し:", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
-        table.Controls.Add(_headingFontCombo, 1, 0);
-        table.Controls.Add(new Label { Text = "サイズ(pt):", AutoSize = true, Anchor = AnchorStyles.Left }, 2, 0);
-        table.Controls.Add(_headingFontSizeNumeric, 3, 0);
+        table.Controls.Add(_headingRecentFontCombo, 1, 0);
+        table.Controls.Add(_headingFontCombo, 2, 0);
+        table.Controls.Add(new Label { Text = "サイズ(pt):", AutoSize = true, Anchor = AnchorStyles.Left }, 3, 0);
+        table.Controls.Add(_headingFontSizeNumeric, 4, 0);
 
         table.Controls.Add(new Label { Text = "本文:", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
-        table.Controls.Add(_bodyFontCombo, 1, 1);
-        table.Controls.Add(new Label { Text = "サイズ(pt):", AutoSize = true, Anchor = AnchorStyles.Left }, 2, 1);
-        table.Controls.Add(_bodyFontSizeNumeric, 3, 1);
+        table.Controls.Add(_bodyRecentFontCombo, 1, 1);
+        table.Controls.Add(_bodyFontCombo, 2, 1);
+        table.Controls.Add(new Label { Text = "サイズ(pt):", AutoSize = true, Anchor = AnchorStyles.Left }, 3, 1);
+        table.Controls.Add(_bodyFontSizeNumeric, 4, 1);
 
         var box = new GroupBox { Text = "フォント設定", Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(6) };
         box.Controls.Add(table);
@@ -149,40 +178,84 @@ public sealed class MainForm : Form
 
     private GroupBox BuildOptionsGroupBox()
     {
-        var table = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Dock = DockStyle.Fill };
+        var table = new TableLayoutPanel { ColumnCount = 3, AutoSize = true, Dock = DockStyle.Fill };
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        var headerPanel = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill };
-        headerPanel.Controls.Add(_headerNoneRadio);
-        headerPanel.Controls.Add(_headerFileNameRadio);
-        headerPanel.Controls.Add(_headerCustomRadio);
-        headerPanel.Controls.Add(_headerCustomTextBox);
+        var headerContentPanel = new FlowLayoutPanel { AutoSize = true };
+        headerContentPanel.Controls.Add(_headerNoneRadio);
+        headerContentPanel.Controls.Add(_headerFileNameRadio);
+        headerContentPanel.Controls.Add(_headerCustomRadio);
+        headerContentPanel.Controls.Add(_headerCustomTextBox);
 
-        var footerPanel = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill };
-        footerPanel.Controls.Add(_footerPageNumberCheck);
+        var headerAlignPanel = new FlowLayoutPanel { AutoSize = true };
+        headerAlignPanel.Controls.Add(_headerAlignLeftRadio);
+        headerAlignPanel.Controls.Add(_headerAlignCenterRadio);
+        headerAlignPanel.Controls.Add(_headerAlignRightRadio);
+
+        var footerContentPanel = new FlowLayoutPanel { AutoSize = true };
+        footerContentPanel.Controls.Add(_footerPageNumberCheck);
+
+        var footerAlignPanel = new FlowLayoutPanel { AutoSize = true };
+        footerAlignPanel.Controls.Add(_footerAlignLeftRadio);
+        footerAlignPanel.Controls.Add(_footerAlignCenterRadio);
+        footerAlignPanel.Controls.Add(_footerAlignRightRadio);
 
         table.Controls.Add(new Label { Text = "ヘッダー:", AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top }, 0, 0);
-        table.Controls.Add(headerPanel, 1, 0);
+        table.Controls.Add(headerContentPanel, 1, 0);
+        table.Controls.Add(headerAlignPanel, 2, 0);
         table.Controls.Add(new Label { Text = "フッター:", AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top }, 0, 1);
-        table.Controls.Add(footerPanel, 1, 1);
+        table.Controls.Add(footerContentPanel, 1, 1);
+        table.Controls.Add(footerAlignPanel, 2, 1);
 
         var box = new GroupBox { Text = "オプション", Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(6) };
         box.Controls.Add(table);
         return box;
     }
 
-    private static ComboBox CreateFontComboBox(string defaultFont)
+    private ComboBox CreateFontComboBox(string defaultFont)
     {
         var combo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
-        var fonts = FontFamily.Families
-            .Select(f => f.Name)
-            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        combo.Items.AddRange(fonts);
-        var idx = Array.IndexOf(fonts, defaultFont);
+        combo.Items.AddRange(_allFonts);
+        var idx = Array.IndexOf(_allFonts, defaultFont);
         combo.SelectedIndex = idx >= 0 ? idx : 0;
         return combo;
+    }
+
+    private void PopulateRecentFontCombo(ComboBox combo, IReadOnlyList<string> history)
+    {
+        combo.Items.Clear();
+        var valid = history.Where(f => Array.IndexOf(_allFonts, f) >= 0).ToList();
+        if (valid.Count == 0)
+        {
+            combo.Items.Add("（なし）");
+            combo.SelectedIndex = 0;
+            combo.Enabled = false;
+        }
+        else
+        {
+            combo.Items.AddRange(valid.ToArray<object>());
+            combo.SelectedIndex = 0;
+            combo.Enabled = true;
+        }
+    }
+
+    private void SyncRecentToMain(ComboBox recentCombo, ComboBox mainCombo)
+    {
+        if (!recentCombo.Enabled) return;
+        var selected = recentCombo.SelectedItem as string;
+        if (selected is null) return;
+        var idx = mainCombo.FindStringExact(selected);
+        if (idx >= 0)
+            mainCombo.SelectedIndex = idx;
+    }
+
+    private static int GetSelectedAlignment(RadioButton leftRadio, RadioButton centerRadio)
+    {
+        if (leftRadio.Checked) return 0;
+        if (centerRadio.Checked) return 1;
+        return 2;
     }
 
     private void RefreshInputMode()
@@ -237,6 +310,8 @@ public sealed class MainForm : Form
             var bodyFontSize = (double)_bodyFontSizeNumeric.Value;
             var headerText = GetHeaderText();
             var addPageNumbers = _footerPageNumberCheck.Checked;
+            var headerAlignment = GetSelectedAlignment(_headerAlignLeftRadio, _headerAlignCenterRadio);
+            var footerAlignment = GetSelectedAlignment(_footerAlignLeftRadio, _footerAlignCenterRadio);
 
             ValidateInput(markdown, outputPath);
 
@@ -250,7 +325,12 @@ public sealed class MainForm : Form
                 markdown, outputPath,
                 headingFontName, headingFontSize,
                 bodyFontName, bodyFontSize,
-                headerText, addPageNumbers));
+                headerText, headerAlignment,
+                addPageNumbers, footerAlignment));
+
+            var history = FontHistory.Update(headingFontName, bodyFontName);
+            PopulateRecentFontCombo(_headingRecentFontCombo, history);
+            PopulateRecentFontCombo(_bodyRecentFontCombo, history);
 
             _resultLabel.Text = $"変換完了: {outputPath}";
         }

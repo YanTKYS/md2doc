@@ -18,7 +18,9 @@ internal static class WordInteropConverter
         string bodyFontName,
         double bodyFontSize,
         string? headerText,
-        bool addPageNumbers)
+        int headerAlignment,
+        bool addPageNumbers,
+        int footerAlignment)
     {
         var wordType = Type.GetTypeFromProgID("Word.Application")
             ?? throw new InvalidOperationException("Microsoft Word が利用できません。");
@@ -33,13 +35,14 @@ internal static class WordInteropConverter
             app.Visible = false;
             doc = app.Documents.Add();
 
+            SetAuthor(doc);
             WriteMarkdown(doc, markdown, headingFontName, headingFontSize, bodyFontName, bodyFontSize);
 
             if (headerText is not null)
-                SetHeader(doc, headerText);
+                SetHeader(doc, headerText, headerAlignment);
 
             if (addPageNumbers)
-                SetFooterPageNumbers(doc);
+                SetFooterPageNumbers(doc, footerAlignment);
 
             doc.SaveAs2(outputPath, 12); // 12 = wdFormatXMLDocument (.docx)
         }
@@ -55,6 +58,18 @@ internal static class WordInteropConverter
                 app.Quit(false);
                 System.Runtime.InteropServices.Marshal.FinalReleaseComObject(app);
             }
+        }
+    }
+
+    private static void SetAuthor(dynamic doc)
+    {
+        try
+        {
+            doc.BuiltInDocumentProperties("Author").Value = "md2doc";
+        }
+        catch
+        {
+            // 作者名の設定失敗は変換結果に影響しない
         }
     }
 
@@ -126,14 +141,15 @@ internal static class WordInteropConverter
         para.Range.Font.Size = fontSize;
     }
 
-    private static void SetHeader(dynamic doc, string headerText)
+    private static void SetHeader(dynamic doc, string headerText, int alignment)
     {
         // 1 = wdHeaderFooterPrimary
         dynamic header = doc.Sections[1].Headers[1];
         header.Range.Text = headerText;
+        header.Range.ParagraphFormat.Alignment = alignment;
     }
 
-    private static void SetFooterPageNumbers(dynamic doc)
+    private static void SetFooterPageNumbers(dynamic doc, int alignment)
     {
         // 1 = wdHeaderFooterPrimary
         dynamic footer = doc.Sections[1].Footers[1];
@@ -149,6 +165,8 @@ internal static class WordInteropConverter
 
         // NUMPAGES フィールドを挿入（26 = wdFieldNumPages）
         range.Fields.Add(range, 26);
+
+        footer.Range.ParagraphFormat.Alignment = alignment;
     }
 
     private static string ParseInline(string text)
