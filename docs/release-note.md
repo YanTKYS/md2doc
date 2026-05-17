@@ -23,23 +23,48 @@ v0.5.2 で完成した本実装を既存 UI と接続し、エンジン切替ま
 
 ## v0.5.2
 
-title: Open XML 方式の本実装候補化（予定）
+title: Open XML 方式の本実装候補化
 
-v0.5.1 POC を本実装に昇格させる。WordInteropConverter の代替として
-正式投入できる水準まで機能を整備する。
+### 変更内容
 
-### 想定変更内容（未実装）
+- `src/md2doc/OpenXmlConverter.cs` を機能拡張（本実装候補クラスに格上げ）
+  - **インライン書式**: 太字（`**` / `__`）・斜体（`*` / `_`）・インラインコード（`` ` ``）を `RunProperties` で装飾出力
+  - **ヘッダー文字列**: `HeaderPart` + `SectionProperties.HeaderReference` で出力（配置指定対応）
+  - **フッター（ページ番号）**: `FooterPart` + `FieldChar / FieldCode(" PAGE ")` で出力
+  - **水平線（HR）**: `ThematicBreakBlock` → `ParagraphBorders.BottomBorder` で出力
+  - **ソフトリターン改善**: `LineBreakInline`（硬改行）および `<br>` タグ → `w:br` で確実に出力
+  - インラインレンダリングを `ExtractInlines`（文字列）から `AppendInlineRuns`（Run 要素直接生成）に刷新
+- `tests/Md2Doc.Tests/OpenXmlConverterTests.cs` に 9 テストを追加（計 26 テスト）
+  - `Header_TextPresent` / `Footer_PageNumber_Present` / `HorizontalRule_Present`
+  - `InlineFormatting_Bold_Present` / `InlineFormatting_Italic_Present`
+  - `InlineFormatting_BoldAndItalicCombined` / `InlineFormatting_InlineCode_UsesCodeFont`
+  - `SoftReturn_HardBreak_Preserved` / `SoftReturn_BrTag_Preserved`
+- `tests/Md2Doc.Tests/DocxInspector.cs` に書式・要素検査メソッドを追加
+  - `HasRunWithTextAndProperty` / `HasRunWithFont` / `FooterHasPageNumber`
+  - `DocumentHasHorizontalRule` / `DocumentHasSoftReturn` / `ExtractHeaderTexts`
+- `docs/poc-openxml.md` を v0.5.2 時点の内容に全面更新
 
-- インライン書式（太字・斜体・インラインコード）の装飾対応（`RunProperties`）
-- ヘッダー・フッター対応（`HeaderPart` / `FooterPart` + `SectionProperties`）
-- 水平線（HR）対応（`ParagraphBorders`）
-- スタイル定義の完全化（色・間隔等）
-- テストの拡充（スタイル属性・XML 構造検査）
+### 対応要素（v0.5.2 完了後）
 
-### 対象外（このバージョンでは扱わない）
+| 要素 | 対応 |
+|------|------|
+| 見出し H1〜H3 / 通常段落 / 箇条書き / 順序付きリスト / 表 / 改ページ / 日本語 | ✅ v0.5.1 |
+| インライン太字・斜体・インラインコード | ✅ v0.5.2 |
+| ヘッダー文字列 / フッターページ番号 | ✅ v0.5.2 |
+| 水平線 / ソフトリターン | ✅ v0.5.2 |
+| 画像・脚注・引用ブロック | ❌ 未対応 |
+
+### 対象外（実装しない）
 
 - UI へのエンジン切替機能追加（v0.6.0 以降）
 - 現行 Word COM エンジンの削除
+- Open XML 方式の標準エンジン化
+
+### 既知の制約
+
+- v0.5.1 の制約のうち、インライン書式・ヘッダー・フッター・水平線・ソフトリターンは本バージョンで解消
+- リスト項目内のインライン書式は lazy continuation 処理の制約によりプレーンテキスト出力のまま
+- スタイル定義（見出し色・間隔）は最小実装のまま（v0.6.0 以降で対応予定）
 
 ---
 

@@ -3,7 +3,7 @@ using Xunit;
 namespace Md2Doc.Tests;
 
 /// <summary>
-/// OpenXmlConverter（Markdig + Open XML SDK）の POC テスト。
+/// OpenXmlConverter（Markdig + Open XML SDK）のテスト。
 /// Microsoft Word 不要 — すべての環境で実行可能。
 /// DocxInspector を共用し、WordInteropConverter テストと同一観点で検証する。
 /// </summary>
@@ -33,7 +33,7 @@ public class OpenXmlConverterTests : IDisposable
             addPageNumbers: false, footerAlignment: 1);
 
     // ──────────────────────────────────────────────────────────────────
-    // 要素別テスト
+    // 要素別テスト（v0.5.1 から継続）
     // ──────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -90,7 +90,6 @@ public class OpenXmlConverterTests : IDisposable
         var path = TempDocx();
         Convert(md, path);
 
-        // 両方のリストの全項目が存在すること
         var paras = DocxInspector.ExtractParagraphTexts(path);
         var (ok, msg) = DocxInspector.VerifyOrder(paras, ["A-1", "A-2", "B-1", "B-2"]);
         Assert.True(ok, msg);
@@ -150,12 +149,131 @@ public class OpenXmlConverterTests : IDisposable
     }
 
     // ──────────────────────────────────────────────────────────────────
+    // v0.5.2 新機能テスト
+    // ──────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Header_TextPresent()
+    {
+        const string md = "段落テキスト";
+        var path = TempDocx();
+        OpenXmlConverter.ConvertToDocx(md, path,
+            bodyFontName: "MS Gothic", bodyFontSize: 11.0,
+            numberHeadings: false,
+            headerText: "ヘッダーテキスト", headerAlignment: 1,
+            addPageNumbers: false, footerAlignment: 1);
+
+        var headerTexts = DocxInspector.ExtractHeaderTexts(path);
+        Assert.Contains(headerTexts, t => t.Contains("ヘッダーテキスト"));
+    }
+
+    [Fact]
+    public void Footer_PageNumber_Present()
+    {
+        const string md = "段落テキスト";
+        var path = TempDocx();
+        OpenXmlConverter.ConvertToDocx(md, path,
+            bodyFontName: "MS Gothic", bodyFontSize: 11.0,
+            numberHeadings: false,
+            headerText: null, headerAlignment: 0,
+            addPageNumbers: true, footerAlignment: 1);
+
+        Assert.True(DocxInspector.FooterHasPageNumber(path));
+    }
+
+    [Fact]
+    public void HorizontalRule_Present()
+    {
+        const string md = "前の段落\n\n---\n\n後の段落";
+        var path = TempDocx();
+        Convert(md, path);
+
+        Assert.True(DocxInspector.DocumentHasHorizontalRule(path));
+        var paras = DocxInspector.ExtractParagraphTexts(path);
+        var (ok, msg) = DocxInspector.VerifyOrder(paras, ["前の段落", "後の段落"]);
+        Assert.True(ok, msg);
+    }
+
+    [Fact]
+    public void InlineFormatting_Bold_Present()
+    {
+        const string md = "通常テキスト **太字テキスト** 通常テキスト";
+        var path = TempDocx();
+        Convert(md, path);
+
+        Assert.True(DocxInspector.HasRunWithTextAndProperty(path, "太字テキスト", "b"),
+            "太字テキストを含む Run に <w:b/> が存在しません。");
+    }
+
+    [Fact]
+    public void InlineFormatting_Italic_Present()
+    {
+        const string md = "通常テキスト *斜体テキスト* 通常テキスト";
+        var path = TempDocx();
+        Convert(md, path);
+
+        Assert.True(DocxInspector.HasRunWithTextAndProperty(path, "斜体テキスト", "i"),
+            "斜体テキストを含む Run に <w:i/> が存在しません。");
+    }
+
+    [Fact]
+    public void InlineFormatting_BoldAndItalicCombined()
+    {
+        const string md = "***太字斜体テキスト***";
+        var path = TempDocx();
+        Convert(md, path);
+
+        Assert.True(DocxInspector.HasRunWithTextAndProperty(path, "太字斜体テキスト", "b"),
+            "太字斜体テキストに <w:b/> が存在しません。");
+        Assert.True(DocxInspector.HasRunWithTextAndProperty(path, "太字斜体テキスト", "i"),
+            "太字斜体テキストに <w:i/> が存在しません。");
+    }
+
+    [Fact]
+    public void InlineFormatting_InlineCode_UsesCodeFont()
+    {
+        const string md = "通常テキスト `コードテキスト` 通常テキスト";
+        var path = TempDocx();
+        Convert(md, path);
+
+        Assert.True(DocxInspector.HasRunWithFont(path, "コードテキスト", "Courier New"),
+            "インラインコードテキストが Courier New フォントで出力されていません。");
+    }
+
+    [Fact]
+    public void SoftReturn_HardBreak_Preserved()
+    {
+        // Markdown の硬改行（行末に2スペース + 改行）→ w:br（ソフトリターン）
+        const string md = "行1  \n行2";
+        var path = TempDocx();
+        Convert(md, path);
+
+        Assert.True(DocxInspector.DocumentHasSoftReturn(path),
+            "硬改行が w:br として出力されていません。");
+        // 両テキストは同一段落内に存在する（段落分割ではなく行内改行）
+        var paras = DocxInspector.ExtractParagraphTexts(path);
+        Assert.Contains(paras, p => p.Contains("行1") && p.Contains("行2"));
+    }
+
+    [Fact]
+    public void SoftReturn_BrTag_Preserved()
+    {
+        const string md = "行1<br>行2";
+        var path = TempDocx();
+        Convert(md, path);
+
+        Assert.True(DocxInspector.DocumentHasSoftReturn(path),
+            "<br> タグが w:br として出力されていません。");
+        var paras = DocxInspector.ExtractParagraphTexts(path);
+        Assert.Contains(paras, p => p.Contains("行1") && p.Contains("行2"));
+    }
+
+    // ──────────────────────────────────────────────────────────────────
     // 回帰テスト（WordInteropConverter テストと同一 Markdown・同一観点）
     // ──────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// WordInteropConverter の Regression_AllTextPresentInOrder と同一 Markdown・同一観点。
-    /// Word COM なしで同等の検証が可能なことを確認する。
     /// </summary>
     [Fact]
     public void Regression_AllTextPresentInOrder()
