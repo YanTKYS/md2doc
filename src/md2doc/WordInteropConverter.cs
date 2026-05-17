@@ -30,6 +30,7 @@ internal static class WordInteropConverter
 
         try
         {
+            AppLog.Info($"変換開始: output={outputPath} headingFont={headingFontName} bodyFont={bodyFontName}");
             app = Activator.CreateInstance(wordType)
                 ?? throw new InvalidOperationException("Wordを起動できません。");
             app.Visible = false;
@@ -45,6 +46,7 @@ internal static class WordInteropConverter
                 SetFooterPageNumbers(doc, footerAlignment);
 
             doc.SaveAs2(outputPath, 12); // 12 = wdFormatXMLDocument (.docx)
+            AppLog.Info($"変換完了: {outputPath}");
         }
         finally
         {
@@ -112,9 +114,10 @@ internal static class WordInteropConverter
         if (!match.Success)
             return false;
 
-        var level = match.Groups[1].Value.Length;
+        var level = Math.Min(match.Groups[1].Value.Length, 3);
         para.Range.Text = ParseInline(match.Groups[2].Value);
-        para.Range.set_Style($"Heading {Math.Min(level, 3)}");
+        // WdBuiltinStyle 定数を使用（言語非依存: Heading N = -(N+1)）
+        para.Range.Style = -(level + 1);
         // スタイル適用後にフォントを上書き（直接書式はスタイル書式より優先される）
         para.Range.Font.Name = fontName;
         para.Range.Font.Size = fontSize;
