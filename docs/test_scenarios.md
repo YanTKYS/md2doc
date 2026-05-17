@@ -52,8 +52,13 @@ Word COM 不要。`MarkdownParser.ParseBlocks` の純粋関数テスト。
 
 ### 統合テスト: DocxConversionTests
 
-**Windows + Microsoft Word が必要。** 未インストール環境ではスキップ。
-`.docx` を展開し `word/document.xml` を直接検査する。
+**Windows + Microsoft Word が必要。**
+Word が利用できない環境（CI 含む）では、テスト本体を実行せずそのまま `return` する。
+
+> **注意**: xUnit はテスト本体を実行しなかった場合も **passed** と表示する。
+> skipped とは表示されないため、CI のグリーン表示だけで統合テストが通過したとは判断できない。
+> テスト出力（`--logger "console;verbosity=normal"`）に `[SKIPPED]` メッセージが出ている場合、
+> Word なし環境のため本体は未実行。
 
 | テスト名 | 検証内容 |
 |----------|----------|
