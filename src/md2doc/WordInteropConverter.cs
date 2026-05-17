@@ -249,10 +249,8 @@ internal static class WordInteropConverter
         var match = BulletPattern.Match(line);
         if (!match.Success) return false;
 
-        // ApplyBulletDefault をテキスト設定より先に呼ぶ
-        // リスト先頭段落では ApplyBulletDefault がテキストをリセットする場合があるため
-        para.Range.ListFormat.ApplyBulletDefault();
         para.Range.Text = ParseInline(match.Groups[1].Value);
+        para.Range.ListFormat.ApplyBulletDefault();
         para.Range.Font.Name = fontName;
         para.Range.Font.Size = fontSize;
         return true;
