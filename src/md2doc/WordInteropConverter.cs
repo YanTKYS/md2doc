@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Md2Doc;
@@ -14,6 +15,17 @@ internal static class WordInteropConverter
     private static readonly Regex PageBreakPattern = new(
         @"^(<!--\s*pagebreak\s*-->|---pagebreak---)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    private enum BlockKind { Empty, Paragraph, Heading, Bullet, Hr, PageBreak, Table }
+
+    private sealed class Block
+    {
+        public BlockKind Kind;
+        public string Text = "";
+        public int HeadingLevel;
+        public List<List<string>>? TableRows;
+        public bool TableHasHeader;
+    }
+
     public static void ConvertToDocx(
         string markdown,
         string outputPath,
@@ -29,12 +41,16 @@ internal static class WordInteropConverter
         var wordType = Type.GetTypeFromProgID("Word.Application")
             ?? throw new InvalidOperationException("Microsoft Word が利用できません。");
 
+        // Phase 1: パース（Word起動前に完了させる）
+        var blocks = ParseBlocks(markdown, numberHeadings);
+        if (blocks.Count == 0) blocks.Add(new Block { Kind = BlockKind.Empty });
+
         dynamic? app = null;
         dynamic? doc = null;
 
         try
         {
-            AppLog.Info($"変換開始: output={outputPath} bodyFont={bodyFontName} numberHeadings={numberHeadings}");
+            AppLog.Info($"変換開始: output={outputPath} bodyFont={bodyFontName} numberHeadings={numberHeadings} blocks={blocks.Count}");
             progress?.Report(5);
 
             app = Activator.CreateInstance(wordType)
@@ -44,7 +60,17 @@ internal static class WordInteropConverter
             progress?.Report(10);
 
             SetAuthor(doc);
-            WriteMarkdown(doc, markdown, bodyFontName, bodyFontSize, numberHeadings, progress);
+
+            // Phase 2: 全段落テキストを一括書き込み
+            WriteAllText(doc, blocks);
+            progress?.Report(40);
+
+            // Phase 3: 段落インデックスでスタイル適用（順方向、テーブルはスキップ）
+            ApplyStyles(doc, blocks, bodyFontName, bodyFontSize, progress);
+            progress?.Report(70);
+
+            // Phase 4: テーブル挿入（逆順、後続インデックスのシフトを無視できる）
+            InsertTables(doc, blocks, bodyFontName, bodyFontSize);
             progress?.Report(80);
 
             if (headerText is not null)
@@ -76,27 +102,11 @@ internal static class WordInteropConverter
         }
     }
 
-    private static void SetAuthor(dynamic doc)
-    {
-        try
-        {
-            doc.BuiltInDocumentProperties("Author").Value = "md2doc";
-        }
-        catch { }
-    }
-
-    private static void WriteMarkdown(
-        dynamic doc,
-        string markdown,
-        string bodyFontName,
-        double bodyFontSize,
-        bool numberHeadings,
-        IProgress<int>? progress)
+    // Phase 1: Markdown を Block リストに変換する（Word に触れない純粋関数）
+    private static List<Block> ParseBlocks(string markdown, bool numberHeadings)
     {
         var lines = markdown.Replace("\r\n", "\n").Split('\n');
-        int total = Math.Max(lines.Length, 1);
-        bool firstParagraphUsed = false;
-        // 見出し番号カウンター [H1, H2, H3]
+        var blocks = new List<Block>();
         var headingCounters = new int[3];
         int i = 0;
 
@@ -104,7 +114,7 @@ internal static class WordInteropConverter
         {
             var line = lines[i].TrimEnd();
 
-            // テーブルブロックの検出：連続する | 行をまとめて処理
+            // テーブルブロック（連続する | 行をまとめる）
             if (IsTableLine(line))
             {
                 var tableLines = new List<string>();
@@ -113,40 +123,184 @@ internal static class WordInteropConverter
                     tableLines.Add(lines[i].TrimEnd());
                     i++;
                 }
-                if (TryTable(doc, tableLines, bodyFontName, bodyFontSize, firstParagraphUsed))
-                    firstParagraphUsed = true;
-                progress?.Report(10 + i * 70 / total);
+                var hasSeparator = tableLines.Any(IsTableSeparator);
+                var dataRows = tableLines
+                    .Where(l => !IsTableSeparator(l))
+                    .Select(ParseTableRow)
+                    .ToList();
+                if (dataRows.Count > 0 && dataRows[0].Count > 0)
+                {
+                    blocks.Add(new Block
+                    {
+                        Kind = BlockKind.Table,
+                        TableRows = dataRows,
+                        TableHasHeader = hasSeparator,
+                    });
+                }
                 continue;
             }
 
             if (string.IsNullOrWhiteSpace(line))
             {
-                if (firstParagraphUsed)
-                    doc.Paragraphs.Add();
+                blocks.Add(new Block { Kind = BlockKind.Empty });
+                i++;
+                continue;
             }
-            else
+
+            var headingMatch = HeadingPattern.Match(line);
+            if (headingMatch.Success)
             {
-                // 新規ドキュメントの最初の空段落を再利用することで先頭の余分な空行を防ぐ
-                // Paragraphs.Add() の戻り値はスタイル操作後に無効化される場合があるため
-                // 常にインデックスで再取得する
-                if (firstParagraphUsed)
-                    doc.Paragraphs.Add();
-                dynamic para = firstParagraphUsed ? doc.Paragraphs[doc.Paragraphs.Count] : doc.Paragraphs[1];
-                firstParagraphUsed = true;
-
-                if (!TryHeading(para, line, numberHeadings, headingCounters) &&
-                    !TryBullet(para, line, bodyFontName, bodyFontSize) &&
-                    !TryHorizontalRule(para, line) &&
-                    !TryPageBreak(para, line))
+                var level = Math.Min(headingMatch.Groups[1].Value.Length, 3);
+                var text = ParseInline(headingMatch.Groups[2].Value);
+                if (numberHeadings)
                 {
-                    WriteParagraph(para, ParseInline(line), bodyFontName, bodyFontSize);
+                    headingCounters[level - 1]++;
+                    for (int j = level; j < 3; j++) headingCounters[j] = 0;
+                    var prefix = level switch
+                    {
+                        1 => $"{headingCounters[0]}. ",
+                        2 => $"{headingCounters[0]}.{headingCounters[1]} ",
+                        _ => $"{headingCounters[0]}.{headingCounters[1]}.{headingCounters[2]} ",
+                    };
+                    text = prefix + text;
                 }
+                blocks.Add(new Block { Kind = BlockKind.Heading, Text = text, HeadingLevel = level });
+                i++;
+                continue;
             }
 
-            // 10%→80% の範囲で行ごとに進捗報告
-            progress?.Report(10 + (i + 1) * 70 / total);
+            // 改ページ判定は HR より先（--- 系の重複を避ける）
+            if (PageBreakPattern.IsMatch(line))
+            {
+                blocks.Add(new Block { Kind = BlockKind.PageBreak });
+                i++;
+                continue;
+            }
+
+            var bulletMatch = BulletPattern.Match(line);
+            if (bulletMatch.Success)
+            {
+                blocks.Add(new Block { Kind = BlockKind.Bullet, Text = ParseInline(bulletMatch.Groups[1].Value) });
+                i++;
+                continue;
+            }
+
+            if (HrPattern.IsMatch(line))
+            {
+                blocks.Add(new Block { Kind = BlockKind.Hr });
+                i++;
+                continue;
+            }
+
+            blocks.Add(new Block { Kind = BlockKind.Paragraph, Text = ParseInline(line) });
             i++;
         }
+
+        return blocks;
+    }
+
+    private static string GetParagraphText(Block block) => block.Kind switch
+    {
+        BlockKind.Heading => block.Text,
+        BlockKind.Bullet => block.Text,
+        BlockKind.Paragraph => block.Text,
+        BlockKind.PageBreak => "\f", // Chr(12) = wdPageBreak
+        _ => "", // Empty / Hr / Table はプレースホルダー段落
+    };
+
+    // Phase 2: 全段落テキストを 1 回の COM 呼び出しで書き込む
+    private static void WriteAllText(dynamic doc, List<Block> blocks)
+    {
+        var sb = new StringBuilder();
+        for (int i = 0; i < blocks.Count; i++)
+        {
+            sb.Append(GetParagraphText(blocks[i]));
+            if (i < blocks.Count - 1) sb.Append('\r'); // 段落マーク
+        }
+        // doc.Content.Text への代入で既存の空段落を含めて全文を置き換える
+        doc.Content.Text = sb.ToString();
+    }
+
+    // Phase 3: 既に確定した段落構造に対してスタイル・書式を適用する
+    private static void ApplyStyles(
+        dynamic doc, List<Block> blocks,
+        string bodyFontName, double bodyFontSize,
+        IProgress<int>? progress)
+    {
+        int total = Math.Max(blocks.Count, 1);
+        for (int i = 0; i < blocks.Count; i++)
+        {
+            var block = blocks[i];
+            // テーブルは Phase 4 で挿入する
+            if (block.Kind == BlockKind.Table) continue;
+
+            dynamic para = doc.Paragraphs[i + 1];
+
+            switch (block.Kind)
+            {
+                case BlockKind.Heading:
+                    // WdBuiltinStyle: Heading N = -(N+1)。フォント上書きせず Word 標準書式を使う
+                    para.Range.Style = -(block.HeadingLevel + 1);
+                    break;
+                case BlockKind.Bullet:
+                    para.Range.ListFormat.ApplyBulletDefault();
+                    para.Range.Font.Name = bodyFontName;
+                    para.Range.Font.Size = bodyFontSize;
+                    break;
+                case BlockKind.Paragraph:
+                    para.Range.Font.Name = bodyFontName;
+                    para.Range.Font.Size = bodyFontSize;
+                    break;
+                case BlockKind.Hr:
+                    // -3 = wdBorderBottom, 1 = wdLineStyleSingle
+                    para.Borders[-3].LineStyle = 1;
+                    break;
+                case BlockKind.PageBreak:
+                case BlockKind.Empty:
+                    // 段落テキストのみで成立（追加書式不要）
+                    break;
+            }
+
+            progress?.Report(40 + (i + 1) * 30 / total);
+        }
+    }
+
+    // Phase 4: プレースホルダー段落の位置にテーブルを挿入する
+    // 逆順処理により、挿入で発生するインデックスシフトの影響を回避
+    private static void InsertTables(dynamic doc, List<Block> blocks, string fontName, double fontSize)
+    {
+        for (int i = blocks.Count - 1; i >= 0; i--)
+        {
+            var block = blocks[i];
+            if (block.Kind != BlockKind.Table) continue;
+
+            var dataRows = block.TableRows!;
+            var colCount = dataRows[0].Count;
+
+            dynamic para = doc.Paragraphs[i + 1];
+            dynamic table = doc.Tables.Add(para.Range, dataRows.Count, colCount);
+            table.Borders.Enable = 1;
+
+            for (int r = 0; r < dataRows.Count; r++)
+            {
+                var cells = dataRows[r];
+                for (int c = 0; c < Math.Min(cells.Count, colCount); c++)
+                {
+                    var cell = table.Cell(r + 1, c + 1);
+                    cell.Range.Text = cells[c];
+                    cell.Range.Font.Name = fontName;
+                    cell.Range.Font.Size = fontSize;
+                    if (block.TableHasHeader && r == 0)
+                        cell.Range.Font.Bold = 1;
+                }
+            }
+        }
+    }
+
+    private static void SetAuthor(dynamic doc)
+    {
+        try { doc.BuiltInDocumentProperties("Author").Value = "md2doc"; }
+        catch { }
     }
 
     private static bool IsTableLine(string line)
@@ -161,111 +315,11 @@ internal static class WordInteropConverter
     private static List<string> ParseTableRow(string line)
     {
         var parts = line.Split('|');
-        return parts.Length < 2 ? [] : parts[1..^1].Select(p => p.Trim()).ToList();
-    }
-
-    private static bool TryTable(
-        dynamic doc, List<string> tableLines,
-        string fontName, double fontSize, bool firstParagraphUsed)
-    {
-        bool hasSeparator = tableLines.Any(IsTableSeparator);
-        var dataRows = tableLines.Where(l => !IsTableSeparator(l)).ToList();
-        if (dataRows.Count == 0) return false;
-
-        var colCount = ParseTableRow(dataRows[0]).Count;
-        if (colCount == 0) return false;
-
-        if (firstParagraphUsed)
-            doc.Paragraphs.Add();
-        dynamic anchorPara = firstParagraphUsed ? doc.Paragraphs[doc.Paragraphs.Count] : doc.Paragraphs[1];
-        dynamic table = doc.Tables.Add(anchorPara.Range, dataRows.Count, colCount);
-        table.Borders.Enable = 1;
-
-        for (int r = 0; r < dataRows.Count; r++)
-        {
-            var cells = ParseTableRow(dataRows[r]);
-            for (int c = 0; c < Math.Min(cells.Count, colCount); c++)
-            {
-                var cell = table.Cell(r + 1, c + 1);
-                cell.Range.Text = ParseInline(cells[c]);
-                cell.Range.Font.Name = fontName;
-                cell.Range.Font.Size = fontSize;
-                // 区切り行がある場合は先頭行をヘッダーとして太字にする
-                if (hasSeparator && r == 0)
-                    cell.Range.Font.Bold = 1;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool TryHeading(dynamic para, string line, bool numberHeadings, int[] counters)
-    {
-        var match = HeadingPattern.Match(line);
-        if (!match.Success) return false;
-
-        var level = Math.Min(match.Groups[1].Value.Length, 3);
-        var text = ParseInline(match.Groups[2].Value);
-
-        if (numberHeadings)
-        {
-            counters[level - 1]++;
-            for (int i = level; i < 3; i++) counters[i] = 0;
-
-            var prefix = level switch
-            {
-                1 => $"{counters[0]}. ",
-                2 => $"{counters[0]}.{counters[1]} ",
-                _ => $"{counters[0]}.{counters[1]}.{counters[2]} ",
-            };
-            text = prefix + text;
-        }
-
-        para.Range.Text = text;
-        // WdBuiltinStyle 定数を使用（言語非依存: Heading N = -(N+1)）
-        // フォント上書きなし — Wordの標準見出しスタイルの書式をそのまま適用する
-        para.Range.Style = -(level + 1);
-        return true;
-    }
-
-    private static bool TryHorizontalRule(dynamic para, string line)
-    {
-        if (!HrPattern.IsMatch(line)) return false;
-        // -3 = wdBorderBottom, 1 = wdLineStyleSingle
-        para.Borders[-3].LineStyle = 1;
-        return true;
-    }
-
-    private static bool TryPageBreak(dynamic para, string line)
-    {
-        if (!PageBreakPattern.IsMatch(line)) return false;
-        // \f = Chr(12) = wdPageBreak — 改ページ文字を段落テキストとして挿入
-        para.Range.Text = "\f";
-        return true;
-    }
-
-    private static bool TryBullet(dynamic para, string line, string fontName, double fontSize)
-    {
-        var match = BulletPattern.Match(line);
-        if (!match.Success) return false;
-
-        para.Range.Text = ParseInline(match.Groups[1].Value);
-        para.Range.ListFormat.ApplyBulletDefault();
-        para.Range.Font.Name = fontName;
-        para.Range.Font.Size = fontSize;
-        return true;
-    }
-
-    private static void WriteParagraph(dynamic para, string text, string fontName, double fontSize)
-    {
-        para.Range.Text = text;
-        para.Range.Font.Name = fontName;
-        para.Range.Font.Size = fontSize;
+        return parts.Length < 2 ? [] : parts[1..^1].Select(p => ParseInline(p.Trim())).ToList();
     }
 
     private static void SetHeader(dynamic doc, string headerText, int alignment)
     {
-        // 1 = wdHeaderFooterPrimary
         dynamic header = doc.Sections[1].Headers[1];
         header.Range.Text = headerText;
         header.Range.ParagraphFormat.Alignment = alignment;
@@ -273,27 +327,21 @@ internal static class WordInteropConverter
 
     private static void SetFooterPageNumbers(dynamic doc, int alignment)
     {
-        // 1 = wdHeaderFooterPrimary
         dynamic footer = doc.Sections[1].Footers[1];
         dynamic range = footer.Range;
+        range.Fields.Add(range, 33); // wdFieldPage
 
-        // PAGE フィールドを挿入（33 = wdFieldPage）
-        range.Fields.Add(range, 33);
-
-        // フィールド挿入後に Range を再取得してセパレータを追記
         range = footer.Range;
         range.InsertAfter(" / ");
-        range.Collapse(0); // 0 = wdCollapseEnd
-
-        // NUMPAGES フィールドを挿入（26 = wdFieldNumPages）
-        range.Fields.Add(range, 26);
+        range.Collapse(0); // wdCollapseEnd
+        range.Fields.Add(range, 26); // wdFieldNumPages
 
         footer.Range.ParagraphFormat.Alignment = alignment;
     }
 
     private static string ParseInline(string text)
     {
-        // <br> / <br/> / <BR> 等を Word のソフトリターン（Chr(11)）に変換
+        // <br> 系を Word のソフトリターン（Chr(11)）に変換
         var result = BrTagPattern.Replace(text, "\v");
         result = BoldPattern.Replace(result, "$1");
         result = ItalicPattern.Replace(result, "$1");
