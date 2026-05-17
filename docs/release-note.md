@@ -1,5 +1,38 @@
 # Release Notes
 
+## v0.6.0
+
+title: Markdig + Open XML SDK 方式の POC 実装
+
+### 変更内容
+
+- `src/md2doc/OpenXmlConverter.cs` を新規追加（POC 変換クラス、Word COM 不要）
+  - Markdig（AST パース）+ DocumentFormat.OpenXml（OOXML 直接構築）
+  - WordInteropConverter と同一シグネチャで共存
+  - 対応要素: 見出し H1〜H3 / 通常段落 / 箇条書き / 順序付きリスト / 表 / 改ページ / 日本語本文
+  - 順序付きリストに正式対応（Word COM 方式では未対応だった）
+  - v0.3.0 の本文消失・箇条書き伝播問題が構造的に発生しない
+- `tests/Md2Doc.Tests/OpenXmlConverterTests.cs` を新規追加（13 テスト、全 Word 不要）
+  - CI で完全実行可能（Word なし環境でも passed 偽装なし）
+  - DocxConversionTests と同一 Markdown・同一観点で回帰テストを設計
+- `docs/poc-openxml.md` を新規追加（POC 実装記録・制約・移行リスト）
+- `docs/engine-comparison.md` に POC 結果を追記
+- NuGet 追加: `Markdig 0.37.0`（BSD-2-Clause）/ `DocumentFormat.OpenXml 3.2.0`（MIT）
+
+### 対象外（実装しない）
+
+- 現行 Word COM エンジンの削除
+- UI へのエンジン切替機能追加
+- インライン書式の装飾（POC では除去のみ）
+- ヘッダー・フッター対応
+- 正式採用判断（v0.7.0 以降）
+
+### 既知の制約
+
+- v0.4.0 の制約をすべて引き継ぐ
+- OpenXmlConverter は POC クラスであり、本番運用は現行 WordInteropConverter を使用する
+- 配布サイズが Markdig + DocumentFormat.OpenXml の追加で約 6〜8 MB 増加
+
 ## v0.5.0
 
 title: 変換エンジン比較検証（ドキュメントのみ）
