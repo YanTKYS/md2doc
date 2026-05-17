@@ -138,6 +138,13 @@ public sealed class MainForm : Form
 
         Controls.Add(root);
 
+        AllowDrop = true;
+        _markdownTextBox.AllowDrop = true;
+        DragEnter += OnFileDragEnter;
+        DragDrop += OnFileDragDrop;
+        _markdownTextBox.DragEnter += OnFileDragEnter;
+        _markdownTextBox.DragDrop += OnFileDragDrop;
+
         _textInputRadio.CheckedChanged += (_, _) => { if (_textInputRadio.Checked) RefreshInputMode(); };
         _fileInputRadio.CheckedChanged += (_, _) => { if (_fileInputRadio.Checked) RefreshInputMode(); };
         _clearButton.Click += (_, _) => _markdownTextBox.Clear();
@@ -281,6 +288,37 @@ public sealed class MainForm : Form
         if (leftRadio.Checked) return 0;
         if (centerRadio.Checked) return 1;
         return 2;
+    }
+
+    private static void OnFileDragEnter(object? sender, DragEventArgs e)
+    {
+        var files = e.Data?.GetData(DataFormats.FileDrop) as string[];
+        if (files?.Length > 0 && IsAcceptedFile(files[0]))
+            e.Effect = DragDropEffects.Copy;
+    }
+
+    private void OnFileDragDrop(object? sender, DragEventArgs e)
+    {
+        var files = e.Data?.GetData(DataFormats.FileDrop) as string[];
+        if (files?.Length > 0 && IsAcceptedFile(files[0]))
+        {
+            try
+            {
+                _markdownTextBox.Text = File.ReadAllText(files[0], Encoding.UTF8);
+                _textInputRadio.Checked = true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"ファイルの読み込みに失敗しました: {ex.Message}",
+                    "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+    }
+
+    private static bool IsAcceptedFile(string path)
+    {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return ext is ".md" or ".txt";
     }
 
     private void RefreshInputMode()
