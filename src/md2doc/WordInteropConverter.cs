@@ -9,6 +9,7 @@ internal static class WordInteropConverter
     private static readonly Regex BoldPattern = new(@"\*\*(.+?)\*\*", RegexOptions.Compiled);
     private static readonly Regex ItalicPattern = new(@"\*(.+?)\*", RegexOptions.Compiled);
     private static readonly Regex CodePattern = new(@"`(.+?)`", RegexOptions.Compiled);
+    private static readonly Regex BrTagPattern = new(@"<br\s*/?>", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public static void ConvertToDocx(
         string markdown,
@@ -20,7 +21,8 @@ internal static class WordInteropConverter
         string? headerText,
         int headerAlignment,
         bool addPageNumbers,
-        int footerAlignment)
+        int footerAlignment,
+        IProgress<int>? progress = null)
     {
         var wordType = Type.GetTypeFromProgID("Word.Application")
             ?? throw new InvalidOperationException("Microsoft Word が利用できません。");
@@ -31,21 +33,41 @@ internal static class WordInteropConverter
         try
         {
             AppLog.Info($"変換開始: output={outputPath} headingFont={headingFontName} bodyFont={bodyFontName}");
+            progress?.Report(5);
+
             app = Activator.CreateInstance(wordType)
                 ?? throw new InvalidOperationException("Wordを起動できません。");
             app.Visible = false;
             doc = app.Documents.Add();
+            progress?.Report(10);
 
             SetAuthor(doc);
-            WriteMarkdown(doc, markdown, headingFontName, headingFontSize, bodyFontName, bodyFontSize);
+            WriteMarkdown(doc, markdown, headingFontName, headingFontSize, bodyFontName, bodyFontSize, progress);
+            // WriteMarkdown が 10%→80% を担当するので終了時点で80%
+            progress?.Report(80);
 
             if (headerText is not null)
+            {
                 SetHeader(doc, headerText, headerAlignment);
+                progress?.Report(85);
+            }
+            else
+            {
+                progress?.Report(85);
+            }
 
             if (addPageNumbers)
+            {
                 SetFooterPageNumbers(doc, footerAlignment);
+                progress?.Report(90);
+            }
+            else
+            {
+                progress?.Report(90);
+            }
 
             doc.SaveAs2(outputPath, 12); // 12 = wdFormatXMLDocument (.docx)
+            progress?.Report(95);
             AppLog.Info($"変換完了: {outputPath}");
         }
         finally
@@ -84,30 +106,36 @@ internal static class WordInteropConverter
         string headingFontName,
         double headingFontSize,
         string bodyFontName,
-        double bodyFontSize)
+        double bodyFontSize,
+        IProgress<int>? progress)
     {
         var lines = markdown.Replace("\r\n", "\n").Split('\n');
+        int total = Math.Max(lines.Length, 1);
         bool firstParagraphUsed = false;
 
-        foreach (var rawLine in lines)
+        for (int i = 0; i < lines.Length; i++)
         {
-            var line = rawLine.TrimEnd();
+            var line = lines[i].TrimEnd();
             if (string.IsNullOrWhiteSpace(line))
             {
                 if (firstParagraphUsed)
                     doc.Paragraphs.Add();
-                continue;
             }
-
-            // 新規ドキュメントの最初の空段落を再利用することで先頭の余分な空行を防ぐ
-            dynamic para = firstParagraphUsed ? doc.Paragraphs.Add() : doc.Paragraphs[1];
-            firstParagraphUsed = true;
-
-            if (!TryHeading(para, line, headingFontName, headingFontSize) &&
-                !TryBullet(para, line, bodyFontName, bodyFontSize))
+            else
             {
-                WriteParagraph(para, ParseInline(line), bodyFontName, bodyFontSize);
+                // 新規ドキュメントの最初の空段落を再利用することで先頭の余分な空行を防ぐ
+                dynamic para = firstParagraphUsed ? doc.Paragraphs.Add() : doc.Paragraphs[1];
+                firstParagraphUsed = true;
+
+                if (!TryHeading(para, line, headingFontName, headingFontSize) &&
+                    !TryBullet(para, line, bodyFontName, bodyFontSize))
+                {
+                    WriteParagraph(para, ParseInline(line), bodyFontName, bodyFontSize);
+                }
             }
+
+            // 10%→80% の範囲で行ごとに進捗報告
+            progress?.Report(10 + (i + 1) * 70 / total);
         }
     }
 
@@ -177,7 +205,9 @@ internal static class WordInteropConverter
 
     private static string ParseInline(string text)
     {
-        var result = BoldPattern.Replace(text, "$1");
+        // <br> / <br/> / <BR> 等を Word のソフトリターン（Chr(11)）に変換
+        var result = BrTagPattern.Replace(text, "\v");
+        result = BoldPattern.Replace(result, "$1");
         result = ItalicPattern.Replace(result, "$1");
         result = CodePattern.Replace(result, "$1");
         return result;
