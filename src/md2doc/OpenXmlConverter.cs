@@ -7,6 +7,7 @@ using Markdig;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 
+using MdBlock = Markdig.Syntax.Block;
 using MdTable = Markdig.Extensions.Tables.Table;
 using MdTableRow = Markdig.Extensions.Tables.TableRow;
 using MdTableCell = Markdig.Extensions.Tables.TableCell;
@@ -190,7 +191,7 @@ internal static class OpenXmlConverter
     // ブロックの変換ディスパッチ
     // ────────────────────────────────────────────────────────────────────
 
-    private static void AppendBlock(Body body, Block block, Ctx ctx)
+    private static void AppendBlock(Body body, MdBlock block, Ctx ctx)
     {
         switch (block)
         {
