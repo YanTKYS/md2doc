@@ -1,0 +1,117 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. v0.1.0)'
+        required: true
+        type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Parse release note
+        id: release_note
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          $lines = Get-Content "docs/release-note.md" -Encoding UTF8
+          $inSection = $false
+          $title = $version
+          $bodyLines = [System.Collections.Generic.List[string]]::new()
+          $pastTitle = $false
+
+          foreach ($line in $lines) {
+            $escapedVersion = [regex]::Escape($version)
+            if ($line -match "^## $escapedVersion\s*$") {
+              $inSection = $true
+              continue
+            }
+            if ($inSection) {
+              if ($line -match "^## ") { break }
+              if (-not $pastTitle -and $line -match "^title:\s*(.+)") {
+                $title = $Matches[1].Trim()
+                $pastTitle = $true
+                continue
+              }
+              if ($pastTitle) {
+                $bodyLines.Add($line)
+              }
+            }
+          }
+
+          if (-not $inSection) {
+            Write-Error "Version $version not found in docs/release-note.md"
+            exit 1
+          }
+
+          $body = ($bodyLines -join "`n").Trim()
+
+          # body をファイルへ保存（特殊文字を安全に扱うため）
+          Set-Content -Path "release_body.md" -Value $body -Encoding UTF8
+
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "title=$title" -Encoding UTF8
+
+      - name: Publish
+        run: dotnet publish src/md2doc/md2doc.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugType=none -o publish
+
+      - name: Create zip
+        id: zip
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          $zipName = "md2doc_${version}.zip"
+          $stagingDir = "zip_staging"
+
+          New-Item -ItemType Directory -Path $stagingDir -Force | Out-Null
+
+          # 実行ファイルをルートへ配置
+          Copy-Item "publish/md2doc.exe" "$stagingDir/md2doc.exe"
+
+          # その他のファイルを bin/ へ配置
+          $others = Get-ChildItem "publish" -File | Where-Object { $_.Name -ne "md2doc.exe" }
+          if ($others) {
+            New-Item -ItemType Directory -Path "$stagingDir/bin" -Force | Out-Null
+            $others | Copy-Item -Destination "$stagingDir/bin/"
+          }
+
+          Compress-Archive -Path "$stagingDir/*" -DestinationPath $zipName
+
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "zip_name=$zipName" -Encoding UTF8
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TITLE: ${{ steps.release_note.outputs.title }}
+          VERSION: ${{ inputs.version }}
+          ZIP_NAME: ${{ steps.zip.outputs.zip_name }}
+        run: |
+          if gh release view "$VERSION" > /dev/null 2>&1; then
+            gh release edit "$VERSION" \
+              --title "$RELEASE_TITLE" \
+              --notes-file release_body.md
+            gh release upload "$VERSION" "$ZIP_NAME" --clobber
+          else
+            git tag "$VERSION" || true
+            git push origin "$VERSION" || true
+            gh release create "$VERSION" \
+              --title "$RELEASE_TITLE" \
+              --notes-file release_body.md \
+              "$ZIP_NAME"
+          fi
