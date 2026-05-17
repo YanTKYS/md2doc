@@ -20,3 +20,6 @@ jobs:
 
       - name: Build
         run: dotnet build src/md2doc/md2doc.csproj -c Release
+
+      - name: Test (unit tests; Word integration tests skipped on CI)
+        run: dotnet test tests/Md2Doc.Tests/Md2Doc.Tests.csproj -c Release --logger "console;verbosity=normal"
