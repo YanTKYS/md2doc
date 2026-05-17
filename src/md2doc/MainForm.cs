@@ -72,6 +72,7 @@ public sealed class MainForm : Form
     private string _lastOutputPath = "";
     private string _lastOutputFolder = "";
     private string _suggestedOutputPath = "";
+    private bool _suppressFontSync = false;
 
     public MainForm()
     {
@@ -87,10 +88,6 @@ public sealed class MainForm : Form
 
         _headingFontCombo = CreateFontComboBox("MS Gothic");
         _bodyFontCombo = CreateFontComboBox("MS Gothic");
-
-        var history = FontHistory.Load();
-        PopulateRecentFontCombo(_headingRecentFontCombo, history);
-        PopulateRecentFontCombo(_bodyRecentFontCombo, history);
 
         var root = new TableLayoutPanel
         {
@@ -181,6 +178,11 @@ public sealed class MainForm : Form
         var settings = UserSettings.Load();
         _lastOutputFolder = settings.LastOutputFolder;
         ApplySettings(settings);
+
+        // ApplySettings でメインコンボの選択が確定してから候補を初期化する
+        var history = FontHistory.Load();
+        PopulateRecentFontCombo(_headingRecentFontCombo, _headingFontCombo, history);
+        PopulateRecentFontCombo(_bodyRecentFontCombo, _bodyFontCombo, history);
 
         SuggestOutputPath();
     }
@@ -281,26 +283,37 @@ public sealed class MainForm : Form
         return combo;
     }
 
-    private void PopulateRecentFontCombo(ComboBox combo, IReadOnlyList<string> history)
+    private void PopulateRecentFontCombo(ComboBox recentCombo, ComboBox mainCombo, IReadOnlyList<string> history)
     {
-        combo.Items.Clear();
-        var valid = history.Where(f => Array.IndexOf(_allFonts, f) >= 0).ToList();
-        if (valid.Count == 0)
+        _suppressFontSync = true;
+        try
         {
-            combo.Items.Add("（なし）");
-            combo.SelectedIndex = 0;
-            combo.Enabled = false;
+            recentCombo.Items.Clear();
+            var valid = history.Where(f => Array.IndexOf(_allFonts, f) >= 0).ToList();
+            if (valid.Count == 0)
+            {
+                recentCombo.Items.Add("（なし）");
+                recentCombo.SelectedIndex = 0;
+                recentCombo.Enabled = false;
+            }
+            else
+            {
+                recentCombo.Items.AddRange(valid.ToArray<object>());
+                var current = mainCombo.SelectedItem as string;
+                var idx = current is not null ? valid.IndexOf(current) : -1;
+                recentCombo.SelectedIndex = idx >= 0 ? idx : 0;
+                recentCombo.Enabled = true;
+            }
         }
-        else
+        finally
         {
-            combo.Items.AddRange(valid.ToArray<object>());
-            combo.SelectedIndex = 0;
-            combo.Enabled = true;
+            _suppressFontSync = false;
         }
     }
 
     private void SyncRecentToMain(ComboBox recentCombo, ComboBox mainCombo)
     {
+        if (_suppressFontSync) return;
         if (!recentCombo.Enabled) return;
         var selected = recentCombo.SelectedItem as string;
         if (selected is null) return;
@@ -540,8 +553,8 @@ public sealed class MainForm : Form
             _openFolderButton.Enabled = true;
 
             var history = FontHistory.Update(headingFontName, bodyFontName);
-            PopulateRecentFontCombo(_headingRecentFontCombo, history);
-            PopulateRecentFontCombo(_bodyRecentFontCombo, history);
+            PopulateRecentFontCombo(_headingRecentFontCombo, _headingFontCombo, history);
+            PopulateRecentFontCombo(_bodyRecentFontCombo, _bodyFontCombo, history);
 
             CaptureSettings().Save();
             _resultLabel.Text = $"変換完了: {outputPath}";
