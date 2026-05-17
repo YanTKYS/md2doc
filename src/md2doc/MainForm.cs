@@ -283,6 +283,8 @@ public sealed class MainForm : Form
         return combo;
     }
 
+    private const string RecentFontPlaceholder = "── 履歴から選択 ──";
+
     private void PopulateRecentFontCombo(ComboBox recentCombo, ComboBox mainCombo, IReadOnlyList<string> history)
     {
         _suppressFontSync = true;
@@ -292,16 +294,18 @@ public sealed class MainForm : Form
             var valid = history.Where(f => Array.IndexOf(_allFonts, f) >= 0).ToList();
             if (valid.Count == 0)
             {
-                recentCombo.Items.Add("（なし）");
+                recentCombo.Items.Add("（履歴なし）");
                 recentCombo.SelectedIndex = 0;
                 recentCombo.Enabled = false;
             }
             else
             {
+                recentCombo.Items.Add(RecentFontPlaceholder);
                 recentCombo.Items.AddRange(valid.ToArray<object>());
                 var current = mainCombo.SelectedItem as string;
                 var idx = current is not null ? valid.IndexOf(current) : -1;
-                recentCombo.SelectedIndex = idx >= 0 ? idx : 0;
+                // 一致する履歴があればその行を選択、なければプレースホルダーを表示
+                recentCombo.SelectedIndex = idx >= 0 ? idx + 1 : 0;
                 recentCombo.Enabled = true;
             }
         }
@@ -316,7 +320,8 @@ public sealed class MainForm : Form
         if (_suppressFontSync) return;
         if (!recentCombo.Enabled) return;
         var selected = recentCombo.SelectedItem as string;
-        if (selected is null) return;
+        // プレースホルダー行は何もしない
+        if (selected is null || selected == RecentFontPlaceholder) return;
         var idx = mainCombo.FindStringExact(selected);
         if (idx >= 0)
             mainCombo.SelectedIndex = idx;
