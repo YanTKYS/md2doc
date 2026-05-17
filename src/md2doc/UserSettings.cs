@@ -5,11 +5,12 @@ namespace Md2Doc;
 
 internal sealed class UserSettings
 {
-    // フォント
-    public string HeadingFontName { get; set; } = "MS Gothic";
-    public double HeadingFontSize { get; set; } = 14.0;
+    // フォント（本文）
     public string BodyFontName { get; set; } = "MS Gothic";
     public double BodyFontSize { get; set; } = 11.0;
+
+    // 見出しオプション
+    public bool HeadingNumbering { get; set; } = false;
 
     // ヘッダー: Mode 0=なし 1=ファイル名 2=自由記入
     public int HeaderMode { get; set; } = 0;
