@@ -11,14 +11,15 @@ internal static class WordInteropConverter
     private static readonly Regex CodePattern = new(@"`(.+?)`", RegexOptions.Compiled);
     private static readonly Regex BrTagPattern = new(@"<br\s*/?>", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex HrPattern = new(@"^[-*_]{3,}\s*$", RegexOptions.Compiled);
+    private static readonly Regex PageBreakPattern = new(
+        @"^(<!--\s*pagebreak\s*-->|---pagebreak---)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public static void ConvertToDocx(
         string markdown,
         string outputPath,
-        string headingFontName,
-        double headingFontSize,
         string bodyFontName,
         double bodyFontSize,
+        bool numberHeadings,
         string? headerText,
         int headerAlignment,
         bool addPageNumbers,
@@ -33,7 +34,7 @@ internal static class WordInteropConverter
 
         try
         {
-            AppLog.Info($"変換開始: output={outputPath} headingFont={headingFontName} bodyFont={bodyFontName}");
+            AppLog.Info($"変換開始: output={outputPath} bodyFont={bodyFontName} numberHeadings={numberHeadings}");
             progress?.Report(5);
 
             app = Activator.CreateInstance(wordType)
@@ -43,29 +44,16 @@ internal static class WordInteropConverter
             progress?.Report(10);
 
             SetAuthor(doc);
-            WriteMarkdown(doc, markdown, headingFontName, headingFontSize, bodyFontName, bodyFontSize, progress);
-            // WriteMarkdown が 10%→80% を担当するので終了時点で80%
+            WriteMarkdown(doc, markdown, bodyFontName, bodyFontSize, numberHeadings, progress);
             progress?.Report(80);
 
             if (headerText is not null)
-            {
                 SetHeader(doc, headerText, headerAlignment);
-                progress?.Report(85);
-            }
-            else
-            {
-                progress?.Report(85);
-            }
+            progress?.Report(85);
 
             if (addPageNumbers)
-            {
                 SetFooterPageNumbers(doc, footerAlignment);
-                progress?.Report(90);
-            }
-            else
-            {
-                progress?.Report(90);
-            }
+            progress?.Report(90);
 
             doc.SaveAs2(outputPath, 12); // 12 = wdFormatXMLDocument (.docx)
             progress?.Report(95);
@@ -73,7 +61,6 @@ internal static class WordInteropConverter
         }
         finally
         {
-            // Close/Quit を個別の try-catch で保護し、例外が出ても必ず FinalReleaseComObject を実行する
             if (doc is not null)
             {
                 try { doc.Close(false); }
@@ -95,24 +82,22 @@ internal static class WordInteropConverter
         {
             doc.BuiltInDocumentProperties("Author").Value = "md2doc";
         }
-        catch
-        {
-            // 作者名の設定失敗は変換結果に影響しない
-        }
+        catch { }
     }
 
     private static void WriteMarkdown(
         dynamic doc,
         string markdown,
-        string headingFontName,
-        double headingFontSize,
         string bodyFontName,
         double bodyFontSize,
+        bool numberHeadings,
         IProgress<int>? progress)
     {
         var lines = markdown.Replace("\r\n", "\n").Split('\n');
         int total = Math.Max(lines.Length, 1);
         bool firstParagraphUsed = false;
+        // 見出し番号カウンター [H1, H2, H3]
+        var headingCounters = new int[3];
         int i = 0;
 
         while (i < lines.Length)
@@ -145,9 +130,10 @@ internal static class WordInteropConverter
                 dynamic para = firstParagraphUsed ? doc.Paragraphs.Add() : doc.Paragraphs[1];
                 firstParagraphUsed = true;
 
-                if (!TryHeading(para, line, headingFontName, headingFontSize) &&
+                if (!TryHeading(para, line, numberHeadings, headingCounters) &&
                     !TryBullet(para, line, bodyFontName, bodyFontSize) &&
-                    !TryHorizontalRule(para, line))
+                    !TryHorizontalRule(para, line) &&
+                    !TryPageBreak(para, line))
                 {
                     WriteParagraph(para, ParseInline(line), bodyFontName, bodyFontSize);
                 }
@@ -207,19 +193,32 @@ internal static class WordInteropConverter
         return true;
     }
 
-    private static bool TryHeading(dynamic para, string line, string fontName, double fontSize)
+    private static bool TryHeading(dynamic para, string line, bool numberHeadings, int[] counters)
     {
         var match = HeadingPattern.Match(line);
-        if (!match.Success)
-            return false;
+        if (!match.Success) return false;
 
         var level = Math.Min(match.Groups[1].Value.Length, 3);
-        para.Range.Text = ParseInline(match.Groups[2].Value);
+        var text = ParseInline(match.Groups[2].Value);
+
+        if (numberHeadings)
+        {
+            counters[level - 1]++;
+            for (int i = level; i < 3; i++) counters[i] = 0;
+
+            var prefix = level switch
+            {
+                1 => $"{counters[0]}. ",
+                2 => $"{counters[0]}.{counters[1]} ",
+                _ => $"{counters[0]}.{counters[1]}.{counters[2]} ",
+            };
+            text = prefix + text;
+        }
+
+        para.Range.Text = text;
         // WdBuiltinStyle 定数を使用（言語非依存: Heading N = -(N+1)）
+        // フォント上書きなし — Wordの標準見出しスタイルの書式をそのまま適用する
         para.Range.Style = -(level + 1);
-        // スタイル適用後にフォントを上書き（直接書式はスタイル書式より優先される）
-        para.Range.Font.Name = fontName;
-        para.Range.Font.Size = fontSize;
         return true;
     }
 
@@ -231,11 +230,18 @@ internal static class WordInteropConverter
         return true;
     }
 
+    private static bool TryPageBreak(dynamic para, string line)
+    {
+        if (!PageBreakPattern.IsMatch(line)) return false;
+        // \f = Chr(12) = wdPageBreak — 改ページ文字を段落テキストとして挿入
+        para.Range.Text = "\f";
+        return true;
+    }
+
     private static bool TryBullet(dynamic para, string line, string fontName, double fontSize)
     {
         var match = BulletPattern.Match(line);
-        if (!match.Success)
-            return false;
+        if (!match.Success) return false;
 
         para.Range.Text = ParseInline(match.Groups[1].Value);
         para.Range.ListFormat.ApplyBulletDefault();
