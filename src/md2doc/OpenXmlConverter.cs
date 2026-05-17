@@ -270,14 +270,32 @@ internal static class OpenXmlConverter
 
         foreach (var item in list.OfType<ListItemBlock>())
         {
-            var itemText = GetContainerText(item);
-            var para = new Paragraph();
-            para.Append(new ParagraphProperties(
-                new NumberingProperties(
-                    new NumberingLevelReference { Val = 0 },
-                    new NumberingId { Val = numId })));
-            para.Append(MakeRun(itemText, ctx.FontName, ctx.FontSize));
-            body.Append(para);
+            // 最初の子ブロックをリスト項目テキストとして使用する。
+            // Markdig の tight list では後続の段落が ListItemBlock の子として
+            // 格納されることがあるため、それらは独立した本文段落として出力する。
+            bool first = true;
+            foreach (var child in item)
+            {
+                var childText = child is LeafBlock leaf && leaf.Inline is not null
+                    ? ExtractInlines(leaf.Inline)
+                    : child is ContainerBlock nested ? GetContainerText(nested) : "";
+
+                if (first)
+                {
+                    var para = new Paragraph();
+                    para.Append(new ParagraphProperties(
+                        new NumberingProperties(
+                            new NumberingLevelReference { Val = 0 },
+                            new NumberingId { Val = numId })));
+                    para.Append(MakeRun(childText, ctx.FontName, ctx.FontSize));
+                    body.Append(para);
+                    first = false;
+                }
+                else
+                {
+                    body.Append(RenderBodyParagraph(childText, ctx));
+                }
+            }
         }
     }
 
