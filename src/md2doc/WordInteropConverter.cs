@@ -10,6 +10,7 @@ internal static class WordInteropConverter
     private static readonly Regex ItalicPattern = new(@"\*(.+?)\*", RegexOptions.Compiled);
     private static readonly Regex CodePattern = new(@"`(.+?)`", RegexOptions.Compiled);
     private static readonly Regex BrTagPattern = new(@"<br\s*/?>", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex HrPattern = new(@"^[-*_]{3,}\s*$", RegexOptions.Compiled);
 
     public static void ConvertToDocx(
         string markdown,
@@ -145,7 +146,8 @@ internal static class WordInteropConverter
                 firstParagraphUsed = true;
 
                 if (!TryHeading(para, line, headingFontName, headingFontSize) &&
-                    !TryBullet(para, line, bodyFontName, bodyFontSize))
+                    !TryBullet(para, line, bodyFontName, bodyFontSize) &&
+                    !TryHorizontalRule(para, line))
                 {
                     WriteParagraph(para, ParseInline(line), bodyFontName, bodyFontSize);
                 }
@@ -218,6 +220,14 @@ internal static class WordInteropConverter
         // スタイル適用後にフォントを上書き（直接書式はスタイル書式より優先される）
         para.Range.Font.Name = fontName;
         para.Range.Font.Size = fontSize;
+        return true;
+    }
+
+    private static bool TryHorizontalRule(dynamic para, string line)
+    {
+        if (!HrPattern.IsMatch(line)) return false;
+        // -3 = wdBorderBottom, 1 = wdLineStyleSingle
+        para.Borders[-3].LineStyle = 1;
         return true;
     }
 

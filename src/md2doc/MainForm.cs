@@ -70,6 +70,7 @@ public sealed class MainForm : Form
         Text = "Markdown変換ツール（Word）";
         Width = 960;
         Height = 860;
+        Icon = AppIcon.Create();
 
         _allFonts = FontFamily.Families
             .Select(f => f.Name)
