@@ -10,7 +10,15 @@ internal static class WordInteropConverter
     private static readonly Regex ItalicPattern = new(@"\*(.+?)\*", RegexOptions.Compiled);
     private static readonly Regex CodePattern = new(@"`(.+?)`", RegexOptions.Compiled);
 
-    public static void ConvertToDocx(string markdown, string outputPath, string fontName, double fontSize)
+    public static void ConvertToDocx(
+        string markdown,
+        string outputPath,
+        string headingFontName,
+        double headingFontSize,
+        string bodyFontName,
+        double bodyFontSize,
+        string? headerText,
+        bool addPageNumbers)
     {
         var wordType = Type.GetTypeFromProgID("Word.Application")
             ?? throw new InvalidOperationException("Microsoft Word が利用できません。");
@@ -25,10 +33,13 @@ internal static class WordInteropConverter
             app.Visible = false;
             doc = app.Documents.Add();
 
-            WriteMarkdown(doc, markdown);
+            WriteMarkdown(doc, markdown, headingFontName, headingFontSize, bodyFontName, bodyFontSize);
 
-            doc.Content.Font.Name = fontName;
-            doc.Content.Font.Size = fontSize;
+            if (headerText is not null)
+                SetHeader(doc, headerText);
+
+            if (addPageNumbers)
+                SetFooterPageNumbers(doc);
 
             doc.SaveAs2(outputPath, 12); // 12 = wdFormatXMLDocument (.docx)
         }
@@ -39,7 +50,6 @@ internal static class WordInteropConverter
                 doc.Close(false);
                 System.Runtime.InteropServices.Marshal.FinalReleaseComObject(doc);
             }
-
             if (app is not null)
             {
                 app.Quit(false);
@@ -48,7 +58,13 @@ internal static class WordInteropConverter
         }
     }
 
-    private static void WriteMarkdown(dynamic doc, string markdown)
+    private static void WriteMarkdown(
+        dynamic doc,
+        string markdown,
+        string headingFontName,
+        double headingFontSize,
+        string bodyFontName,
+        double bodyFontSize)
     {
         var lines = markdown.Replace("\r\n", "\n").Split('\n');
         bool firstParagraphUsed = false;
@@ -59,9 +75,7 @@ internal static class WordInteropConverter
             if (string.IsNullOrWhiteSpace(line))
             {
                 if (firstParagraphUsed)
-                {
                     doc.Paragraphs.Add();
-                }
                 continue;
             }
 
@@ -69,43 +83,72 @@ internal static class WordInteropConverter
             dynamic para = firstParagraphUsed ? doc.Paragraphs.Add() : doc.Paragraphs[1];
             firstParagraphUsed = true;
 
-            if (!TryHeading(para, line) && !TryBullet(para, line))
+            if (!TryHeading(para, line, headingFontName, headingFontSize) &&
+                !TryBullet(para, line, bodyFontName, bodyFontSize))
             {
-                WriteParagraph(para, ParseInline(line));
+                WriteParagraph(para, ParseInline(line), bodyFontName, bodyFontSize);
             }
         }
     }
 
-    private static bool TryHeading(dynamic para, string line)
+    private static bool TryHeading(dynamic para, string line, string fontName, double fontSize)
     {
         var match = HeadingPattern.Match(line);
         if (!match.Success)
-        {
             return false;
-        }
 
         var level = match.Groups[1].Value.Length;
         para.Range.Text = ParseInline(match.Groups[2].Value);
         para.Range.set_Style($"Heading {Math.Min(level, 3)}");
+        // スタイル適用後にフォントを上書き（直接書式はスタイル書式より優先される）
+        para.Range.Font.Name = fontName;
+        para.Range.Font.Size = fontSize;
         return true;
     }
 
-    private static bool TryBullet(dynamic para, string line)
+    private static bool TryBullet(dynamic para, string line, string fontName, double fontSize)
     {
         var match = BulletPattern.Match(line);
         if (!match.Success)
-        {
             return false;
-        }
 
         para.Range.Text = ParseInline(match.Groups[1].Value);
         para.Range.ListFormat.ApplyBulletDefault();
+        para.Range.Font.Name = fontName;
+        para.Range.Font.Size = fontSize;
         return true;
     }
 
-    private static void WriteParagraph(dynamic para, string text)
+    private static void WriteParagraph(dynamic para, string text, string fontName, double fontSize)
     {
         para.Range.Text = text;
+        para.Range.Font.Name = fontName;
+        para.Range.Font.Size = fontSize;
+    }
+
+    private static void SetHeader(dynamic doc, string headerText)
+    {
+        // 1 = wdHeaderFooterPrimary
+        dynamic header = doc.Sections[1].Headers[1];
+        header.Range.Text = headerText;
+    }
+
+    private static void SetFooterPageNumbers(dynamic doc)
+    {
+        // 1 = wdHeaderFooterPrimary
+        dynamic footer = doc.Sections[1].Footers[1];
+        dynamic range = footer.Range;
+
+        // PAGE フィールドを挿入（33 = wdFieldPage）
+        range.Fields.Add(range, 33);
+
+        // フィールド挿入後に Range を再取得してセパレータを追記
+        range = footer.Range;
+        range.InsertAfter(" / ");
+        range.Collapse(0); // 0 = wdCollapseEnd
+
+        // NUMPAGES フィールドを挿入（26 = wdFieldNumPages）
+        range.Fields.Add(range, 26);
     }
 
     private static string ParseInline(string text)
