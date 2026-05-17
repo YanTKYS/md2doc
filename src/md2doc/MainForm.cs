@@ -313,7 +313,7 @@ public sealed class MainForm : Form
         try
         {
             _convertButton.Enabled = false;
-            _resultLabel.Text = string.Empty;
+            _resultLabel.Text = "変換中...";
 
             var markdown = GetMarkdownInput();
             var outputPath = _outputFilePathTextBox.Text.Trim();
@@ -349,6 +349,7 @@ public sealed class MainForm : Form
         }
         catch (Exception ex)
         {
+            AppLog.Error("変換失敗", ex);
             _resultLabel.Text = $"変換失敗: {ex.Message}";
         }
         finally
