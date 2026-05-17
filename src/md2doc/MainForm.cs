@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing;
 using System.Text;
 
@@ -61,9 +62,16 @@ public sealed class MainForm : Form
     private readonly RadioButton _footerAlignCenterRadio = new() { Text = "中央", Checked = true, AutoSize = true };
     private readonly RadioButton _footerAlignRightRadio = new() { Text = "右寄り", AutoSize = true };
 
-    // 実行・結果
+    // 実行・変換後アクション・結果
     private readonly Button _convertButton = new() { Text = "変換実行", AutoSize = true };
+    private readonly Button _openFileButton = new() { Text = "Wordファイルを開く", AutoSize = true, Enabled = false };
+    private readonly Button _openFolderButton = new() { Text = "保存先フォルダを開く", AutoSize = true, Enabled = false };
     private readonly Label _resultLabel = new() { AutoSize = true };
+
+    // 状態
+    private string _lastOutputPath = "";
+    private string _lastOutputFolder = "";
+    private string _suggestedOutputPath = "";
 
     public MainForm()
     {
@@ -101,7 +109,7 @@ public sealed class MainForm : Form
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // outputPanel
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // fontGroupBox
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // optionsGroupBox
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // convertButton
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // ボタン行
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // resultLabel
 
         var inputModePanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
@@ -124,6 +132,11 @@ public sealed class MainForm : Form
         outputPanel.Controls.Add(_outputFilePathTextBox, 0, 0);
         outputPanel.Controls.Add(_outputBrowseButton, 1, 0);
 
+        var buttonPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
+        buttonPanel.Controls.Add(_convertButton);
+        buttonPanel.Controls.Add(_openFileButton);
+        buttonPanel.Controls.Add(_openFolderButton);
+
         root.Controls.Add(new Label { Text = "入力方式", AutoSize = true });
         root.Controls.Add(inputModePanel);
         root.Controls.Add(mdLabelPanel);
@@ -134,7 +147,7 @@ public sealed class MainForm : Form
         root.Controls.Add(outputPanel);
         root.Controls.Add(BuildFontGroupBox());
         root.Controls.Add(BuildOptionsGroupBox());
-        root.Controls.Add(_convertButton);
+        root.Controls.Add(buttonPanel);
         root.Controls.Add(_resultLabel);
 
         Controls.Add(root);
@@ -149,6 +162,7 @@ public sealed class MainForm : Form
         _textInputRadio.CheckedChanged += (_, _) => { if (_textInputRadio.Checked) RefreshInputMode(); };
         _fileInputRadio.CheckedChanged += (_, _) => { if (_fileInputRadio.Checked) RefreshInputMode(); };
         _clearButton.Click += (_, _) => _markdownTextBox.Clear();
+        _inputFilePathTextBox.TextChanged += (_, _) => SuggestOutputPath();
         _inputBrowseButton.Click += (_, _) => BrowseInputFile();
         _outputBrowseButton.Click += (_, _) => BrowseOutputFile();
         _headerNoneRadio.CheckedChanged += (_, _) => { if (_headerNoneRadio.Checked) RefreshHeaderMode(); };
@@ -156,17 +170,29 @@ public sealed class MainForm : Form
         _headerCustomRadio.CheckedChanged += (_, _) => { if (_headerCustomRadio.Checked) RefreshHeaderMode(); };
         _headingRecentFontCombo.SelectedIndexChanged += (_, _) => SyncRecentToMain(_headingRecentFontCombo, _headingFontCombo);
         _bodyRecentFontCombo.SelectedIndexChanged += (_, _) => SyncRecentToMain(_bodyRecentFontCombo, _bodyFontCombo);
+        _openFileButton.Click += (_, _) => OpenLastOutputFile();
+        _openFolderButton.Click += (_, _) => OpenLastOutputFolder();
         _convertButton.Click += async (_, _) => await ConvertAsync();
 
         RefreshInputMode();
         RefreshHeaderMode();
-        SyncRecentToMain(_headingRecentFontCombo, _headingFontCombo);
-        SyncRecentToMain(_bodyRecentFontCombo, _bodyFontCombo);
+
+        // 保存済み設定を復元（フォント・各種設定・ウィンドウサイズ）
+        var settings = UserSettings.Load();
+        _lastOutputFolder = settings.LastOutputFolder;
+        ApplySettings(settings);
+
+        SuggestOutputPath();
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        CaptureSettings().Save();
+        base.OnFormClosing(e);
     }
 
     private GroupBox BuildFontGroupBox()
     {
-        // ラベルを固定幅・固定高さにすることで FlowLayoutPanel 内でコンボと縦位置を揃える
         const int LabelWidth = 50;
         const int SizeLabelWidth = 74;
         const int RowHeight = 24;
@@ -191,7 +217,6 @@ public sealed class MainForm : Form
         bodyRow.Controls.Add(RowLabel("サイズ(pt):", SizeLabelWidth));
         bodyRow.Controls.Add(_bodyFontSizeNumeric);
 
-        // 1列2行の TableLayoutPanel でヘッダーとボディ行を縦積みする
         var stack = new TableLayoutPanel
         {
             ColumnCount = 1, RowCount = 2, AutoSize = true, Margin = Padding.Empty
@@ -291,6 +316,88 @@ public sealed class MainForm : Form
         return 2;
     }
 
+    private void ApplySettings(UserSettings s)
+    {
+        if (s.WindowWidth >= 500) Width = s.WindowWidth;
+        if (s.WindowHeight >= 400) Height = s.WindowHeight;
+
+        var hIdx = _headingFontCombo.FindStringExact(s.HeadingFontName);
+        if (hIdx >= 0) _headingFontCombo.SelectedIndex = hIdx;
+        _headingFontSizeNumeric.Value = (decimal)Math.Clamp(s.HeadingFontSize, 8, 72);
+
+        var bIdx = _bodyFontCombo.FindStringExact(s.BodyFontName);
+        if (bIdx >= 0) _bodyFontCombo.SelectedIndex = bIdx;
+        _bodyFontSizeNumeric.Value = (decimal)Math.Clamp(s.BodyFontSize, 8, 72);
+
+        if (s.HeaderMode == 1) _headerFileNameRadio.Checked = true;
+        else if (s.HeaderMode == 2) _headerCustomRadio.Checked = true;
+        _headerCustomTextBox.Text = s.HeaderCustomText;
+
+        switch (s.HeaderAlignment)
+        {
+            case 1: _headerAlignCenterRadio.Checked = true; break;
+            case 2: _headerAlignRightRadio.Checked = true; break;
+            default: _headerAlignLeftRadio.Checked = true; break;
+        }
+
+        _footerPageNumberCheck.Checked = s.FooterPageNumber;
+        switch (s.FooterAlignment)
+        {
+            case 0: _footerAlignLeftRadio.Checked = true; break;
+            case 2: _footerAlignRightRadio.Checked = true; break;
+            default: _footerAlignCenterRadio.Checked = true; break;
+        }
+    }
+
+    private UserSettings CaptureSettings() => new()
+    {
+        HeadingFontName = (string?)_headingFontCombo.SelectedItem ?? "MS Gothic",
+        HeadingFontSize = (double)_headingFontSizeNumeric.Value,
+        BodyFontName = (string?)_bodyFontCombo.SelectedItem ?? "MS Gothic",
+        BodyFontSize = (double)_bodyFontSizeNumeric.Value,
+        HeaderMode = _headerNoneRadio.Checked ? 0 : _headerFileNameRadio.Checked ? 1 : 2,
+        HeaderCustomText = _headerCustomTextBox.Text,
+        HeaderAlignment = GetSelectedAlignment(_headerAlignLeftRadio, _headerAlignCenterRadio),
+        FooterPageNumber = _footerPageNumberCheck.Checked,
+        FooterAlignment = GetSelectedAlignment(_footerAlignLeftRadio, _footerAlignCenterRadio),
+        LastOutputFolder = _lastOutputFolder,
+        WindowWidth = Width,
+        WindowHeight = Height,
+    };
+
+    private void SuggestOutputPath()
+    {
+        var current = _outputFilePathTextBox.Text.Trim();
+        // ユーザーが手動入力した場合は上書きしない
+        if (!string.IsNullOrEmpty(current) && current != _suggestedOutputPath)
+            return;
+
+        string suggestion;
+        if (_fileInputRadio.Checked)
+        {
+            var inputPath = _inputFilePathTextBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(inputPath))
+            {
+                _suggestedOutputPath = "";
+                _outputFilePathTextBox.Text = "";
+                return;
+            }
+            var dir = Path.GetDirectoryName(inputPath) ?? "";
+            var name = Path.GetFileNameWithoutExtension(inputPath);
+            suggestion = Path.Combine(dir, name + ".docx");
+        }
+        else
+        {
+            var folder = string.IsNullOrWhiteSpace(_lastOutputFolder)
+                ? Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
+                : _lastOutputFolder;
+            suggestion = Path.Combine(folder, "output.docx");
+        }
+
+        _suggestedOutputPath = suggestion;
+        _outputFilePathTextBox.Text = suggestion;
+    }
+
     private static void OnFileDragEnter(object? sender, DragEventArgs e)
     {
         var files = e.Data?.GetData(DataFormats.FileDrop) as string[];
@@ -306,7 +413,7 @@ public sealed class MainForm : Form
             try
             {
                 _markdownTextBox.Text = File.ReadAllText(files[0], Encoding.UTF8);
-                _textInputRadio.Checked = true;
+                _textInputRadio.Checked = true; // RefreshInputMode → SuggestOutputPath も呼ばれる
             }
             catch (Exception ex)
             {
@@ -322,6 +429,30 @@ public sealed class MainForm : Form
         return ext is ".md" or ".txt";
     }
 
+    private void OpenLastOutputFile()
+    {
+        if (string.IsNullOrEmpty(_lastOutputPath)) return;
+        if (!File.Exists(_lastOutputPath))
+        {
+            MessageBox.Show(this, "ファイルが見つかりません。", "エラー",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        Process.Start(new ProcessStartInfo { FileName = _lastOutputPath, UseShellExecute = true });
+    }
+
+    private void OpenLastOutputFolder()
+    {
+        if (string.IsNullOrEmpty(_lastOutputPath)) return;
+        var folder = Path.GetDirectoryName(_lastOutputPath);
+        if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder)) return;
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "explorer.exe",
+            Arguments = $"/select,\"{_lastOutputPath}\""
+        });
+    }
+
     private void RefreshInputMode()
     {
         var useText = _textInputRadio.Checked;
@@ -332,6 +463,7 @@ public sealed class MainForm : Form
         _headerFileNameRadio.Enabled = !useText;
         if (useText && _headerFileNameRadio.Checked)
             _headerNoneRadio.Checked = true;
+        SuggestOutputPath();
     }
 
     private void RefreshHeaderMode()
@@ -346,7 +478,7 @@ public sealed class MainForm : Form
             Filter = "Markdown/Text (*.md;*.txt)|*.md;*.txt|All files (*.*)|*.*",
         };
         if (dialog.ShowDialog(this) == DialogResult.OK)
-            _inputFilePathTextBox.Text = dialog.FileName;
+            _inputFilePathTextBox.Text = dialog.FileName; // TextChanged → SuggestOutputPath
     }
 
     private void BrowseOutputFile()
@@ -355,9 +487,15 @@ public sealed class MainForm : Form
         {
             Filter = "Word Document (*.docx)|*.docx",
             DefaultExt = "docx",
+            InitialDirectory = !string.IsNullOrWhiteSpace(_lastOutputFolder)
+                ? _lastOutputFolder
+                : Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
         };
         if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            _suggestedOutputPath = ""; // 手動選択済みとしてマーク
             _outputFilePathTextBox.Text = dialog.FileName;
+        }
     }
 
     private async Task ConvertAsync()
@@ -396,10 +534,16 @@ public sealed class MainForm : Form
                 addPageNumbers, footerAlignment,
                 progress));
 
+            _lastOutputPath = outputPath;
+            _lastOutputFolder = Path.GetDirectoryName(outputPath) ?? _lastOutputFolder;
+            _openFileButton.Enabled = true;
+            _openFolderButton.Enabled = true;
+
             var history = FontHistory.Update(headingFontName, bodyFontName);
             PopulateRecentFontCombo(_headingRecentFontCombo, history);
             PopulateRecentFontCombo(_bodyRecentFontCombo, history);
 
+            CaptureSettings().Save();
             _resultLabel.Text = $"変換完了: {outputPath}";
         }
         catch (Exception ex)
