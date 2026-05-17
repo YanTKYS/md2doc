@@ -1,7 +1,7 @@
-# POC 記録: Markdig + Open XML SDK 方式
+# POC 記録 → 本実装候補化記録: Markdig + Open XML SDK 方式
 
-v0.5.1 で実施した Markdig + Open XML SDK 方式（方式 B）の POC 実装記録。
-`docs/engine-comparison.md` の推奨を受けて、実用可能かを検証する。
+v0.5.1 で POC 実装を行い、v0.5.2 で本実装候補として機能拡張した記録。
+`docs/engine-comparison.md` の推奨を受けて、実用可能かを検証・整備する。
 
 ---
 
@@ -11,8 +11,9 @@ v0.5.1 で実施した Markdig + Open XML SDK 方式（方式 B）の POC 実装
 
 | ファイル | 説明 |
 |----------|------|
-| `src/md2doc/OpenXmlConverter.cs` | POC 変換クラス（Word COM 不要） |
-| `tests/Md2Doc.Tests/OpenXmlConverterTests.cs` | POC テスト（全 Word 不要） |
+| `src/md2doc/OpenXmlConverter.cs` | 変換クラス（Word COM 不要） |
+| `tests/Md2Doc.Tests/OpenXmlConverterTests.cs` | テスト（全 Word 不要、26 テスト） |
+| `tests/Md2Doc.Tests/DocxInspector.cs` | docx XML 検査ヘルパー（v0.5.2 で機能拡張） |
 
 ### 依存ライブラリ
 
@@ -46,11 +47,16 @@ OOXML 要素（Paragraph / Run / Table / Break 等）
 | 順序付きリスト | 未対応 | NumberingInstance（LevelOverride で独立番号） |
 | 表 | `doc.Tables.Add()` | `new Table(...)` |
 | 改ページ | `doc.Content.Text` 内に `\f` | `new Break { Type = BreakValues.Page }` |
+| インライン書式 | 除去のみ | `RunProperties` に `Bold` / `Italic` / 等幅フォント |
+| ヘッダー | `doc.Sections(1).Headers(1)` | `HeaderPart` + `SectionProperties.HeaderReference` |
+| フッター（ページ番号） | `doc.Sections(1).Footers(1)` | `FooterPart` + `FieldChar / FieldCode(" PAGE ")` |
+| 水平線 | `para.Range.Borders(-3)` | `ParagraphBorders.BottomBorder` |
+| ソフトリターン | `para.Range.InsertAfter(wdSoftReturn)` | `new Break()` |
 | COM 安定化 | 4 フェーズ + 2 パス補正 | 不要（直接 XML 構築） |
 
 ---
 
-## 3. 対応要素
+## 3. 対応要素（v0.5.2 時点）
 
 | Markdown 要素 | 対応状況 | 備考 |
 |--------------|---------|------|
@@ -62,19 +68,26 @@ OOXML 要素（Paragraph / Run / Table / Break 等）
 | 改ページ（`<!-- pagebreak -->`） | ✅ | HtmlBlock として検出 |
 | 改ページ（`---pagebreak---`） | ✅ | ParagraphBlock として検出 |
 | 日本語本文 | ✅ | EastAsia フォント名設定 |
-| インライン書式（太字・斜体） | △ | テキスト抽出のみ（装飾なし） |
-| インラインコード（`` ` `` ） | △ | テキスト抽出のみ |
-| `<br>` / ソフトリターン | △ | `LineBreakInline` → `Break` |
-| 水平線（`---`） | ❌ | スキップ |
+| インライン太字（`**` / `__`） | ✅ | `RunProperties.Bold` |
+| インライン斜体（`*` / `_`） | ✅ | `RunProperties.Italic` |
+| インラインコード（`` ` ``） | ✅ | Courier New フォント |
+| 太字＋斜体（`***`） | ✅ | 両方の RunProperties を適用 |
+| `<br>` / ソフトリターン | ✅ | `LineBreakInline` / `HtmlInline` → `Break` |
+| 水平線（`---`） | ✅ | `ParagraphBorders.BottomBorder` |
+| ヘッダー文字列 | ✅ | `HeaderPart` + `SectionProperties` |
+| フッター（ページ番号） | ✅ | `FieldChar` + `FieldCode(" PAGE ")` |
 | 見出し番号付与 | ✅ | `numberHeadings=true` 時に文字列プレフィックス |
-| ヘッダー・フッター | ❌ | POC 対象外 |
+| 画像 | ❌ | 未対応 |
+| 脚注・引用ブロック | ❌ | 未対応 |
 
 ---
 
-## 4. テスト結果
+## 4. テスト結果（v0.5.2 時点）
 
-`tests/Md2Doc.Tests/OpenXmlConverterTests.cs` に 13 テストを実装。
+`tests/Md2Doc.Tests/OpenXmlConverterTests.cs` に 26 テストを実装。
 **すべて Microsoft Word 不要で実行可能（CI で実行される）。**
+
+### 要素別テスト（v0.5.1 から継続）
 
 | テスト名 | 観点 |
 |----------|------|
@@ -87,6 +100,25 @@ OOXML 要素（Paragraph / Run / Table / Break 等）
 | `PageBreak_HtmlComment_BothSidesPreserved` | `<!-- pagebreak -->` |
 | `PageBreak_DashSyntax_BothSidesPreserved` | `---pagebreak---` |
 | `Headings_NumberingEnabled_PrefixAdded` | 見出し番号付与 |
+
+### v0.5.2 新機能テスト
+
+| テスト名 | 観点 |
+|----------|------|
+| `Header_TextPresent` | ヘッダー文字列が header パートに出力 |
+| `Footer_PageNumber_Present` | フッターに PAGE フィールドが出力 |
+| `HorizontalRule_Present` | 水平線（段落下罫線）が出力 |
+| `InlineFormatting_Bold_Present` | 太字 `<w:b/>` が Run に設定 |
+| `InlineFormatting_Italic_Present` | 斜体 `<w:i/>` が Run に設定 |
+| `InlineFormatting_BoldAndItalicCombined` | 太字＋斜体の同時適用 |
+| `InlineFormatting_InlineCode_UsesCodeFont` | インラインコードが Courier New |
+| `SoftReturn_HardBreak_Preserved` | 行末2スペース → `w:br` |
+| `SoftReturn_BrTag_Preserved` | `<br>` タグ → `w:br` |
+
+### 回帰テスト（v0.5.1 から継続）
+
+| テスト名 | 観点 |
+|----------|------|
 | `Regression_AllTextPresentInOrder` | 回帰: 全テキスト順序 |
 | `Regression_NoBulletAlternatingLoss` | 回帰: 交互消失なし |
 | `Regression_OrderedAndUnorderedMixed` | 回帰: 混在リスト |
@@ -97,7 +129,7 @@ OOXML 要素（Paragraph / Run / Table / Break 等）
 
 ---
 
-## 5. POC で確認された利点
+## 5. POC → 本実装候補で確認された利点
 
 ### CI 完全統合
 
@@ -112,71 +144,64 @@ Word COM 方式では v0.3.0 にて以下の問題が発生した：
 - 隣接段落へのリスト書式自動伝播
 
 Open XML 方式はこれらの問題が構造的に発生しない。
-段落は `body.Append()` で確定的に追加され、リスト書式は
-`NumberingInstance` として XML に直接記述されるため、
-Word の自動補正・伝播挙動に依存しない。
 
-### 順序付きリスト対応
+### インライン書式（v0.5.2 で対応）
 
-Word COM 方式では未対応（通常段落として処理）だったが、
-Open XML 方式では `NumberingFormat.Decimal` + `LevelText = "%1."` で
-正しく実装できた。
+v0.5.1 では除去のみだったインライン書式を、v0.5.2 で `RunProperties` を通じて完全対応した。
+`EmphasisInline.DelimiterCount` で太字（≥2）と斜体（=1）を区別し、
+`CodeInline` は等幅フォント（Courier New）を適用する。
+
+### ヘッダー・フッター（v0.5.2 で対応）
+
+`HeaderPart` / `FooterPart` + `SectionProperties` の三点セットで実装。
+ページ番号は OOXML フィールド（`FieldChar` + `FieldCode`）方式で実装した。
 
 ---
 
-## 6. POC で確認された制約・懸念点
+## 6. 残存制約・懸念点
 
-### インライン書式の非対応（POC 段階の省略）
+### インライン書式（リスト項目）
 
-太字・斜体・インラインコードはテキスト抽出のみで装飾なし。
-本実装への移行時には `RunProperties` に `Bold`・`Italic`・`Monospace` フォント等を設定する必要がある。
+本文段落・見出し・表セルのインライン書式は対応済み。
+リスト項目のインライン書式（例: `- **太字**項目`）は、lazy continuation 分割処理の
+制約により現状はプレーンテキスト出力となる。将来対応可能。
 
-### ヘッダー・フッター未対応（POC 対象外）
+### 画像・脚注・引用ブロック
 
-`WordInteropConverter` では `SetHeader()` / `SetFooterPageNumbers()` が実装済みだが、
-Open XML 方式では POC 段階でスキップした。
-`HeaderPart` / `FooterPart` + `SectionProperties` で実装可能（追加コスト: 50〜80 行程度）。
+POC / 本実装候補のスコープ外。必要に応じて追加実装する。
 
 ### 配布サイズの増加
 
 `Markdig` + `DocumentFormat.OpenXml` の追加で実行ファイルのサイズが約 6〜8 MB 増加する。
-現行方式（Word 必須、DLL 追加なし）に比べてトレードオフがある。
-
-### 水平線（HR）未実装
-
-`ThematicBreakBlock` を現在スキップしている。
-Word の罫線（`Borders[-3].LineStyle = 1`）相当は `ParagraphBorders` で実装可能。
 
 ### スタイル定義の最小実装
 
 見出しスタイルは Simple な定義のみ。Word の既定テンプレートに比べて
 色・間隔等が異なる場合がある。完全互換には Word の OOXML テンプレートに近い
-スタイル定義が必要。
+スタイル定義が必要（v0.6.0 以降で対応）。
 
 ---
 
-## 7. 本実装化に向けた追加実装リスト
-
-POC から本実装（`WordInteropConverter` の代替）に昇格させるために必要な作業：
+## 7. v0.6.0 以降の課題
 
 | 作業 | 優先度 | コスト目安 |
 |------|--------|-----------|
-| インライン書式（太字・斜体・コード）のテキスト装飾 | 高 | 〜50 行 |
-| ヘッダー・フッター（ファイル名表示・ページ番号） | 高 | 〜80 行 |
-| 水平線（HR） | 低 | 〜15 行 |
+| 正式エンジン採用判断・WordInteropConverter deprecate | 高 | 設計判断 |
+| UI またはビルド設定によるエンジン切替 | 高 | 〜100 行 |
+| リスト項目のインライン書式対応 | 中 | 〜80 行 |
 | スタイル定義の完全化（色・間隔） | 中 | 〜100 行 |
-| `<br>` タグ → ソフトリターン（`Break` 型区別） | 中 | 〜20 行 |
-| 単体テストの拡充（スタイル属性、XML 構造検査） | 中 | 〜100 行 |
+| 画像対応（`ImageInline` → `ImagePart`） | 低 | 〜150 行 |
 
 ---
 
 ## 8. 結論
 
-Markdig + Open XML SDK 方式は **実用可能** であることを POC で確認した。
+v0.5.1 POC → v0.5.2 本実装候補化を経て、Open XML 方式は **現行 WordInteropConverter の
+代替として十分な品質に達した** と評価できる。
 
-- 対象 Markdown 要素（見出し・段落・箇条書き・順序付きリスト・表・改ページ・日本語）は
-  すべて正しく変換される
-- Word COM 方式で発生した挙動依存バグは構造的に排除される
-- テストが CI で完全実行され、回帰検知の品質が大幅に向上する
+- 必須 Markdown 要素（見出し・段落・箇条書き・順序付きリスト・表・改ページ・日本語・
+  インライン書式・ヘッダー・フッター・水平線・ソフトリターン）を網羅
+- Word COM 方式で発生した挙動依存バグは構造的に排除
+- 26 テストが CI で完全実行され、回帰検知の品質が大幅に向上
 
-本実装への移行を v0.5.2 以降の課題として提案する。
+正式採用判断・エンジン切替対応を **v0.6.0** の課題として提案する。
