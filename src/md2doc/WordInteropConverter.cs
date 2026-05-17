@@ -127,11 +127,7 @@ internal static class WordInteropConverter
             else
             {
                 // 新規ドキュメントの最初の空段落を再利用することで先頭の余分な空行を防ぐ
-                // Paragraphs.Add() の戻り値はスタイル操作後に無効化される場合があるため
-                // 常にインデックスで再取得する
-                if (firstParagraphUsed)
-                    doc.Paragraphs.Add();
-                dynamic para = firstParagraphUsed ? doc.Paragraphs[doc.Paragraphs.Count] : doc.Paragraphs[1];
+                dynamic para = firstParagraphUsed ? doc.Paragraphs.Add() : doc.Paragraphs[1];
                 firstParagraphUsed = true;
 
                 if (!TryHeading(para, line, numberHeadings, headingCounters) &&
@@ -175,9 +171,7 @@ internal static class WordInteropConverter
         var colCount = ParseTableRow(dataRows[0]).Count;
         if (colCount == 0) return false;
 
-        if (firstParagraphUsed)
-            doc.Paragraphs.Add();
-        dynamic anchorPara = firstParagraphUsed ? doc.Paragraphs[doc.Paragraphs.Count] : doc.Paragraphs[1];
+        dynamic anchorPara = firstParagraphUsed ? doc.Paragraphs.Add() : doc.Paragraphs[1];
         dynamic table = doc.Tables.Add(anchorPara.Range, dataRows.Count, colCount);
         table.Borders.Enable = 1;
 
@@ -225,6 +219,9 @@ internal static class WordInteropConverter
         // WdBuiltinStyle 定数を使用（言語非依存: Heading N = -(N+1)）
         // フォント上書きなし — Wordの標準見出しスタイルの書式をそのまま適用する
         para.Range.Style = -(level + 1);
+        // スタイル適用後に Range を読み返して Word 内部の段落再計算を確定させる
+        // これをしないと次の Paragraphs.Add() が誤った位置に段落を追加する場合がある
+        _ = para.Range.Text;
         return true;
     }
 
