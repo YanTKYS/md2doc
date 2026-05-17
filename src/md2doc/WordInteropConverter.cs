@@ -127,7 +127,11 @@ internal static class WordInteropConverter
             else
             {
                 // 新規ドキュメントの最初の空段落を再利用することで先頭の余分な空行を防ぐ
-                dynamic para = firstParagraphUsed ? doc.Paragraphs.Add() : doc.Paragraphs[1];
+                // Paragraphs.Add() の戻り値はスタイル操作後に無効化される場合があるため
+                // 常にインデックスで再取得する
+                if (firstParagraphUsed)
+                    doc.Paragraphs.Add();
+                dynamic para = firstParagraphUsed ? doc.Paragraphs[doc.Paragraphs.Count] : doc.Paragraphs[1];
                 firstParagraphUsed = true;
 
                 if (!TryHeading(para, line, numberHeadings, headingCounters) &&
@@ -171,7 +175,9 @@ internal static class WordInteropConverter
         var colCount = ParseTableRow(dataRows[0]).Count;
         if (colCount == 0) return false;
 
-        dynamic anchorPara = firstParagraphUsed ? doc.Paragraphs.Add() : doc.Paragraphs[1];
+        if (firstParagraphUsed)
+            doc.Paragraphs.Add();
+        dynamic anchorPara = firstParagraphUsed ? doc.Paragraphs[doc.Paragraphs.Count] : doc.Paragraphs[1];
         dynamic table = doc.Tables.Add(anchorPara.Range, dataRows.Count, colCount);
         table.Borders.Enable = 1;
 
@@ -243,8 +249,10 @@ internal static class WordInteropConverter
         var match = BulletPattern.Match(line);
         if (!match.Success) return false;
 
-        para.Range.Text = ParseInline(match.Groups[1].Value);
+        // ApplyBulletDefault をテキスト設定より先に呼ぶ
+        // リスト先頭段落では ApplyBulletDefault がテキストをリセットする場合があるため
         para.Range.ListFormat.ApplyBulletDefault();
+        para.Range.Text = ParseInline(match.Groups[1].Value);
         para.Range.Font.Name = fontName;
         para.Range.Font.Size = fontSize;
         return true;
