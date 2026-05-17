@@ -68,7 +68,7 @@ public sealed class MainForm : Form
     {
         Text = "Markdown変換ツール（Word）";
         Width = 960;
-        Height = 800;
+        Height = 860;
 
         _allFonts = FontFamily.Families
             .Select(f => f.Name)
@@ -152,24 +152,32 @@ public sealed class MainForm : Form
 
     private GroupBox BuildFontGroupBox()
     {
-        var table = new TableLayoutPanel { ColumnCount = 5, AutoSize = true };
+        // 2つのコンボボックスを1つのパネルにまとめて4列構成にする
+        var headingFontPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        headingFontPanel.Controls.Add(_headingRecentFontCombo);
+        headingFontPanel.Controls.Add(_headingFontCombo);
+
+        var bodyFontPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        bodyFontPanel.Controls.Add(_bodyRecentFontCombo);
+        bodyFontPanel.Controls.Add(_bodyFontCombo);
+
+        var table = new TableLayoutPanel { ColumnCount = 4, RowCount = 2, AutoSize = true };
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         table.Controls.Add(new Label { Text = "見出し:", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 0);
-        table.Controls.Add(_headingRecentFontCombo, 1, 0);
-        table.Controls.Add(_headingFontCombo, 2, 0);
-        table.Controls.Add(new Label { Text = "サイズ(pt):", AutoSize = true, Anchor = AnchorStyles.Left }, 3, 0);
-        table.Controls.Add(_headingFontSizeNumeric, 4, 0);
+        table.Controls.Add(headingFontPanel, 1, 0);
+        table.Controls.Add(new Label { Text = "サイズ(pt):", AutoSize = true, Anchor = AnchorStyles.Left }, 2, 0);
+        table.Controls.Add(_headingFontSizeNumeric, 3, 0);
 
         table.Controls.Add(new Label { Text = "本文:", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
-        table.Controls.Add(_bodyRecentFontCombo, 1, 1);
-        table.Controls.Add(_bodyFontCombo, 2, 1);
-        table.Controls.Add(new Label { Text = "サイズ(pt):", AutoSize = true, Anchor = AnchorStyles.Left }, 3, 1);
-        table.Controls.Add(_bodyFontSizeNumeric, 4, 1);
+        table.Controls.Add(bodyFontPanel, 1, 1);
+        table.Controls.Add(new Label { Text = "サイズ(pt):", AutoSize = true, Anchor = AnchorStyles.Left }, 2, 1);
+        table.Controls.Add(_bodyFontSizeNumeric, 3, 1);
 
         var box = new GroupBox { Text = "フォント設定", Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(6) };
         box.Controls.Add(table);
@@ -178,36 +186,41 @@ public sealed class MainForm : Form
 
     private GroupBox BuildOptionsGroupBox()
     {
-        var table = new TableLayoutPanel { ColumnCount = 3, AutoSize = true, Dock = DockStyle.Fill };
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-
-        var headerContentPanel = new FlowLayoutPanel { AutoSize = true };
-        headerContentPanel.Controls.Add(_headerNoneRadio);
-        headerContentPanel.Controls.Add(_headerFileNameRadio);
-        headerContentPanel.Controls.Add(_headerCustomRadio);
-        headerContentPanel.Controls.Add(_headerCustomTextBox);
-
-        var headerAlignPanel = new FlowLayoutPanel { AutoSize = true };
+        var headerAlignPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
         headerAlignPanel.Controls.Add(_headerAlignLeftRadio);
         headerAlignPanel.Controls.Add(_headerAlignCenterRadio);
         headerAlignPanel.Controls.Add(_headerAlignRightRadio);
 
-        var footerContentPanel = new FlowLayoutPanel { AutoSize = true };
-        footerContentPanel.Controls.Add(_footerPageNumberCheck);
-
-        var footerAlignPanel = new FlowLayoutPanel { AutoSize = true };
+        var footerAlignPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
         footerAlignPanel.Controls.Add(_footerAlignLeftRadio);
         footerAlignPanel.Controls.Add(_footerAlignCenterRadio);
         footerAlignPanel.Controls.Add(_footerAlignRightRadio);
 
+        // ヘッダー行：内容選択 + 配置選択を横並びにまとめる
+        var headerRowPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        headerRowPanel.Controls.Add(_headerNoneRadio);
+        headerRowPanel.Controls.Add(_headerFileNameRadio);
+        headerRowPanel.Controls.Add(_headerCustomRadio);
+        headerRowPanel.Controls.Add(_headerCustomTextBox);
+        headerRowPanel.Controls.Add(new Label { Text = "  ", AutoSize = true }); // spacer
+        headerRowPanel.Controls.Add(headerAlignPanel);
+
+        // フッター行：内容選択 + 配置選択を横並びにまとめる
+        var footerRowPanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        footerRowPanel.Controls.Add(_footerPageNumberCheck);
+        footerRowPanel.Controls.Add(new Label { Text = "  ", AutoSize = true }); // spacer
+        footerRowPanel.Controls.Add(footerAlignPanel);
+
+        var table = new TableLayoutPanel { ColumnCount = 2, RowCount = 2, AutoSize = true };
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+
         table.Controls.Add(new Label { Text = "ヘッダー:", AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top }, 0, 0);
-        table.Controls.Add(headerContentPanel, 1, 0);
-        table.Controls.Add(headerAlignPanel, 2, 0);
+        table.Controls.Add(headerRowPanel, 1, 0);
         table.Controls.Add(new Label { Text = "フッター:", AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top }, 0, 1);
-        table.Controls.Add(footerContentPanel, 1, 1);
-        table.Controls.Add(footerAlignPanel, 2, 1);
+        table.Controls.Add(footerRowPanel, 1, 1);
 
         var box = new GroupBox { Text = "オプション", Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(6) };
         box.Controls.Add(table);
