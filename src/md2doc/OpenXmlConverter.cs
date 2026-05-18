@@ -302,15 +302,17 @@ internal static class OpenXmlConverter
 
     private static Paragraph RenderHeading(HeadingBlock h, Ctx ctx)
     {
-        var level = Math.Min(h.Level, 3);
+        var styleLevel = Math.Min(h.Level, 3);
         var para = new Paragraph();
-        para.Append(new ParagraphProperties(new ParagraphStyleId { Val = $"Heading{level}" }));
+        para.Append(new ParagraphProperties(new ParagraphStyleId { Val = $"Heading{styleLevel}" }));
 
-        if (ctx.NumberHeadings)
+        // 見出し番号は H1〜H3 のみ付与。H4 以上は番号カウンタを破壊しないよう
+        // 番号付与とカウンタ更新の両方をスキップする（スタイルは H3 として描画される）。
+        if (ctx.NumberHeadings && h.Level <= 3)
         {
-            ctx.HeadingCounters[level - 1]++;
-            for (int j = level; j < 3; j++) ctx.HeadingCounters[j] = 0;
-            var prefix = level switch
+            ctx.HeadingCounters[styleLevel - 1]++;
+            for (int j = styleLevel; j < 3; j++) ctx.HeadingCounters[j] = 0;
+            var prefix = styleLevel switch
             {
                 1 => $"{ctx.HeadingCounters[0]}. ",
                 2 => $"{ctx.HeadingCounters[0]}.{ctx.HeadingCounters[1]} ",
@@ -419,6 +421,8 @@ internal static class OpenXmlConverter
         borders.Append(new BottomBorder { Val = BorderValues.Single, Size = 6, Space = 1, Color = "000000" });
         pProps.Append(borders);
         para.Append(pProps);
+        // Run なし段落は一部のリーダー（LibreOffice 等）で罫線が描画されないため空 Run を追加する
+        para.Append(new Run());
         return para;
     }
 
