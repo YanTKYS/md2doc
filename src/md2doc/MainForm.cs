@@ -220,7 +220,7 @@ public sealed class MainForm : Form
         bodyRow.Controls.Add(RowLabel("サイズ(pt):", SizeLabelWidth));
         bodyRow.Controls.Add(_bodyFontSizeNumeric);
 
-        var box = new GroupBox { Text = "本文フォント設定", Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(6) };
+        var box = new GroupBox { Text = "文書フォント設定", Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(6) };
         box.Controls.Add(bodyRow);
         return box;
     }
