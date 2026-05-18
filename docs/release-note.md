@@ -2,22 +2,55 @@
 
 ## v0.6.0
 
-title: Open XML 方式の採用判断・標準化・エンジン切替対応（予定）
+title: Open XML 方式の標準化・v1.0.0 配布準備（予定）
 
-v0.5.1 POC の結果を踏まえ、Open XML 方式を正式エンジンとして採用・標準化する。
-v0.5.2 で完成した本実装を既存 UI と接続し、エンジン切替または完全移行を行う。
+v0.5.3 の比較検証結果を踏まえ、Open XML 方式の正式採用判断・配布準備を行う。
 
 ### 想定変更内容（未実装）
 
-- OpenXmlConverter の正式採用と WordInteropConverter の deprecate 判断
-- UI またはビルド設定によるエンジン切替機能（設定選択 / ビルド時固定 / 段階的切替）
-- 方式 A（Word COM）廃止タイミングの決定
-- 移行完了後の配布・ドキュメント更新
+- Open XML 方式の正式採用判断・WordInteropConverter の deprecate 決定
+- Word COM 方式廃止タイミングの決定
+- v1.0.0 に向けた配布パッケージの整備
 
 ### 対象外（このバージョンでは扱わない）
 
 - 新規 Markdown 要素への対応
 - UI の大幅改修
+
+---
+
+## v0.5.3
+
+title: 変換方式選択 UI の追加・Open XML 方式の比較利用開始
+
+### 変更内容
+
+- オプション欄に「変換エンジン」選択行を追加
+  - **Open XML 方式（Word不要・標準候補）** — 初期値
+  - **Word COM 方式（互換確認用・Microsoft Word必要）**
+- 選択したエンジンに応じて `OpenXmlConverter.ConvertToDocx()` / `WordInteropConverter.ConvertToDocx()` を切り替えて呼び出す
+- 変換結果ラベルに使用エンジンを表示（例: `変換完了 [Open XML]: output.docx`）
+- 選択したエンジンを `ConversionEngine` として設定ファイルに保存・復元
+  - 既存設定ファイルに `ConversionEngine` がない場合は `"OpenXml"` を既定値とする
+- フォームタイトルを「Markdown変換ツール（Word）」→「Markdown変換ツール」に変更
+- `UserSettings.ConversionEngine` プロパティを追加
+
+### 選択 UI の意図
+
+- **Open XML 方式を初期値** としたのは、v1.0.0 での標準候補として検証を積むため
+- Word COM 方式は削除せず **互換確認用** として維持する
+- 両方式で同一入力・同一設定値（フォント・ヘッダー・フッター等）を共通利用する
+
+### 対象外（実装しない）
+
+- Open XML 方式の正式採用・Word COM 方式の廃止（v0.6.0 以降）
+- 画像・脚注・引用ブロック対応
+- 大規模な画面改修
+
+### 既知の制約
+
+- v0.5.2 の制約をすべて引き継ぐ
+- Open XML 方式でのリスト項目内インライン書式はプレーンテキスト出力（v0.6.0 以降で対応予定）
 
 ---
 

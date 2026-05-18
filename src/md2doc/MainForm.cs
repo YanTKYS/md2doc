@@ -62,6 +62,19 @@ public sealed class MainForm : Form
     private readonly RadioButton _footerAlignCenterRadio = new() { Text = "中央", Checked = true, AutoSize = true };
     private readonly RadioButton _footerAlignRightRadio = new() { Text = "右寄り", AutoSize = true };
 
+    // 変換エンジン選択（既定: Open XML方式）
+    private readonly RadioButton _engineOpenXmlRadio = new()
+    {
+        Text = "Open XML方式（Word不要・標準候補）",
+        Checked = true,
+        AutoSize = true,
+    };
+    private readonly RadioButton _engineWordComRadio = new()
+    {
+        Text = "Word COM方式（互換確認用・Microsoft Word必要）",
+        AutoSize = true,
+    };
+
     // 実行・変換後アクション・結果
     private readonly Button _convertButton = new() { Text = "変換実行", AutoSize = true };
     private readonly Button _openFileButton = new() { Text = "Wordファイルを開く", AutoSize = true, Enabled = false };
@@ -76,7 +89,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "Markdown変換ツール（Word）";
+        Text = "Markdown変換ツール";
         Width = 960;
         Height = 860;
         Icon = AppIcon.Create();
@@ -237,9 +250,14 @@ public sealed class MainForm : Form
         footerRowPanel.Controls.Add(new Label { Text = "  ", AutoSize = true });
         footerRowPanel.Controls.Add(footerAlignPanel);
 
-        var table = new TableLayoutPanel { ColumnCount = 2, RowCount = 3, AutoSize = true };
+        var enginePanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        enginePanel.Controls.Add(_engineOpenXmlRadio);
+        enginePanel.Controls.Add(_engineWordComRadio);
+
+        var table = new TableLayoutPanel { ColumnCount = 2, RowCount = 4, AutoSize = true };
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -250,6 +268,8 @@ public sealed class MainForm : Form
         table.Controls.Add(headerRowPanel, 1, 1);
         table.Controls.Add(new Label { Text = "フッター:", AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top }, 0, 2);
         table.Controls.Add(footerRowPanel, 1, 2);
+        table.Controls.Add(new Label { Text = "変換エンジン:", AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top }, 0, 3);
+        table.Controls.Add(enginePanel, 1, 3);
 
         var box = new GroupBox { Text = "オプション", Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(6) };
         box.Controls.Add(table);
@@ -342,6 +362,12 @@ public sealed class MainForm : Form
             case 2: _footerAlignRightRadio.Checked = true; break;
             default: _footerAlignCenterRadio.Checked = true; break;
         }
+
+        // 既存設定に ConversionEngine がない場合は "OpenXml"（UserSettings 既定値）になる
+        if (s.ConversionEngine == "WordCom")
+            _engineWordComRadio.Checked = true;
+        else
+            _engineOpenXmlRadio.Checked = true;
     }
 
     private UserSettings CaptureSettings() => new()
@@ -354,6 +380,7 @@ public sealed class MainForm : Form
         HeaderAlignment = GetSelectedAlignment(_headerAlignLeftRadio, _headerAlignCenterRadio),
         FooterPageNumber = _footerPageNumberCheck.Checked,
         FooterAlignment = GetSelectedAlignment(_footerAlignLeftRadio, _footerAlignCenterRadio),
+        ConversionEngine = _engineOpenXmlRadio.Checked ? "OpenXml" : "WordCom",
         LastOutputFolder = _lastOutputFolder,
         WindowWidth = Width,
         WindowHeight = Height,
@@ -518,14 +545,28 @@ public sealed class MainForm : Form
             }
 
             var progress = new Progress<int>(pct => _resultLabel.Text = $"変換中... {pct}%");
+            bool useOpenXml = _engineOpenXmlRadio.Checked;
 
-            await Task.Run(() => WordInteropConverter.ConvertToDocx(
-                markdown, outputPath,
-                bodyFontName, bodyFontSize,
-                numberHeadings,
-                headerText, headerAlignment,
-                addPageNumbers, footerAlignment,
-                progress));
+            if (useOpenXml)
+            {
+                await Task.Run(() => OpenXmlConverter.ConvertToDocx(
+                    markdown, outputPath,
+                    bodyFontName, bodyFontSize,
+                    numberHeadings,
+                    headerText, headerAlignment,
+                    addPageNumbers, footerAlignment,
+                    progress));
+            }
+            else
+            {
+                await Task.Run(() => WordInteropConverter.ConvertToDocx(
+                    markdown, outputPath,
+                    bodyFontName, bodyFontSize,
+                    numberHeadings,
+                    headerText, headerAlignment,
+                    addPageNumbers, footerAlignment,
+                    progress));
+            }
 
             _lastOutputPath = outputPath;
             _lastOutputFolder = Path.GetDirectoryName(outputPath) ?? _lastOutputFolder;
@@ -536,7 +577,8 @@ public sealed class MainForm : Form
             PopulateRecentFontCombo(_bodyRecentFontCombo, _bodyFontCombo, history);
 
             CaptureSettings().Save();
-            _resultLabel.Text = $"変換完了: {outputPath}";
+            var engineLabel = useOpenXml ? "[Open XML]" : "[Word COM]";
+            _resultLabel.Text = $"変換完了 {engineLabel}: {outputPath}";
         }
         catch (Exception ex)
         {
