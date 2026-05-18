@@ -21,6 +21,10 @@ internal sealed class UserSettings
     public bool FooterPageNumber { get; set; } = false;
     public int FooterAlignment { get; set; } = 1; // 0=左 1=中央 2=右
 
+    // 変換エンジン: "OpenXml"（既定）または "WordCom"
+    // 既存設定に項目がない場合は既定値 "OpenXml" が使われる（JSON デシリアライズのデフォルト動作）
+    public string ConversionEngine { get; set; } = "OpenXml";
+
     // 出力先・ウィンドウ
     public string LastOutputFolder { get; set; } = "";
     public int WindowWidth { get; set; } = 960;
