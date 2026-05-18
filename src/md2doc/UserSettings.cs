@@ -40,9 +40,25 @@ internal sealed class UserSettings
         {
             if (!File.Exists(FilePath)) return new();
             var json = File.ReadAllText(FilePath, Encoding.UTF8);
-            return JsonSerializer.Deserialize<UserSettings>(json) ?? new();
+            var settings = JsonSerializer.Deserialize<UserSettings>(json) ?? new();
+            settings.Normalize();
+            return settings;
         }
         catch { return new(); }
+    }
+
+    // 設定ファイルが手動編集された場合や、過去バージョンとの非互換に備え、
+    // 不正な値を既定値に丸めて UI 側の switch default 等で誤った挙動を防ぐ。
+    private void Normalize()
+    {
+        if (string.IsNullOrWhiteSpace(BodyFontName)) BodyFontName = "MS Gothic";
+        BodyFontSize = Math.Clamp(BodyFontSize, 8.0, 72.0);
+        if (HeaderMode is < 0 or > 2) HeaderMode = 0;
+        HeaderCustomText ??= "";
+        if (HeaderAlignment is < 0 or > 2) HeaderAlignment = 0;
+        if (FooterAlignment is < 0 or > 2) FooterAlignment = 1;
+        if (ConversionEngine != "OpenXml" && ConversionEngine != "WordCom") ConversionEngine = "OpenXml";
+        LastOutputFolder ??= "";
     }
 
     public void Save()

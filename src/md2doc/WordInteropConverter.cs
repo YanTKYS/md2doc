@@ -4,6 +4,19 @@ namespace Md2Doc;
 
 internal static class WordInteropConverter
 {
+    // Word VBA 定数（Word Interop dynamic 経由のため数値で参照する）
+    private const int WdStyleNormal = -1;          // wdStyleNormal
+    private const int WdStyleListBullet = -47;     // wdStyleListBullet
+    private const int WdBorderBottom = -3;         // wdBorderBottom
+    private const int WdLineStyleSingle = 1;       // wdLineStyleSingle
+    private const int WdListNoNumbering = 0;       // wdListNoNumbering
+    private const int WdCollapseEnd = 0;           // wdCollapseEnd
+    private const int WdFieldPage = 33;            // wdFieldPage
+    private const int WdFieldNumPages = 26;        // wdFieldNumPages
+    private const int WdFormatXMLDocument = 12;    // wdFormatXMLDocument (.docx)
+    // 見出しスタイル: Heading N → -(N+1)（wdStyleHeading1=-2, Heading2=-3, Heading3=-4）
+    private static int WdStyleHeading(int level) => -(level + 1);
+
     public static void ConvertToDocx(
         string markdown,
         string outputPath,
@@ -59,7 +72,7 @@ internal static class WordInteropConverter
                 SetFooterPageNumbers(doc, footerAlignment);
             progress?.Report(90);
 
-            doc.SaveAs2(outputPath, 12); // 12 = wdFormatXMLDocument (.docx)
+            doc.SaveAs2(outputPath, WdFormatXMLDocument);
             progress?.Report(95);
             AppLog.Info($"変換完了: {outputPath}");
         }
@@ -122,27 +135,26 @@ internal static class WordInteropConverter
             switch (block.Kind)
             {
                 case BlockKind.Heading:
-                    // WdBuiltinStyle: Heading N = -(N+1)。フォント上書きせず Word 標準書式を使う
-                    para.Range.Style = -(block.HeadingLevel + 1);
+                    // フォント上書きせず Word 標準書式を使う
+                    para.Range.Style = WdStyleHeading(block.HeadingLevel);
                     break;
                 case BlockKind.Bullet:
-                    // -47 = wdStyleListBullet。ApplyBulletDefault() と異なりトグルではなく確定的な設定
-                    para.Range.Style = -47;
+                    // ApplyBulletDefault() と異なりトグルではなく確定的な設定
+                    para.Range.Style = WdStyleListBullet;
                     para.Range.Font.Name = bodyFontName;
                     para.Range.Font.Size = bodyFontSize;
                     break;
                 case BlockKind.Paragraph:
-                    para.Range.Style = -1; // wdStyleNormal
+                    para.Range.Style = WdStyleNormal;
                     para.Range.Font.Name = bodyFontName;
                     para.Range.Font.Size = bodyFontSize;
                     break;
                 case BlockKind.Empty:
-                    para.Range.Style = -1;
+                    para.Range.Style = WdStyleNormal;
                     break;
                 case BlockKind.Hr:
-                    para.Range.Style = -1;
-                    // -3 = wdBorderBottom, 1 = wdLineStyleSingle
-                    para.Borders[-3].LineStyle = 1;
+                    para.Range.Style = WdStyleNormal;
+                    para.Borders[WdBorderBottom].LineStyle = WdLineStyleSingle;
                     break;
                 case BlockKind.PageBreak:
                     // \f で段落テキストが設定済み、追加書式不要
@@ -164,8 +176,8 @@ internal static class WordInteropConverter
             try
             {
                 dynamic para = doc.Paragraphs[i + 1];
-                // 0 = wdListNoNumbering。既にリスト書式が無ければ何もしない
-                if ((int)para.Range.ListFormat.ListType != 0)
+                // 既にリスト書式が無ければ何もしない
+                if ((int)para.Range.ListFormat.ListType != WdListNoNumbering)
                     para.Range.ListFormat.RemoveNumbers();
             }
             catch (Exception ex)
@@ -226,12 +238,12 @@ internal static class WordInteropConverter
     {
         dynamic footer = doc.Sections[1].Footers[1];
         dynamic range = footer.Range;
-        range.Fields.Add(range, 33); // wdFieldPage
+        range.Fields.Add(range, WdFieldPage);
 
         range = footer.Range;
         range.InsertAfter(" / ");
-        range.Collapse(0); // wdCollapseEnd
-        range.Fields.Add(range, 26); // wdFieldNumPages
+        range.Collapse(WdCollapseEnd);
+        range.Fields.Add(range, WdFieldNumPages);
 
         footer.Range.ParagraphFormat.Alignment = alignment;
     }

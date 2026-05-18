@@ -1,5 +1,41 @@
 # Release Notes
 
+## v0.5.5
+
+title: 潜在的バグ修正・コード整理（メンテナンスリリース）
+
+ソースコードベースのコードレビューで検出した潜在的バグの修正と、内部実装の整理を行う。
+外部仕様・UI 文言・設定ファイル互換性に影響する変更はない。
+
+### バグ修正
+
+- `OpenXmlConverter.RenderHeading`: H4 以上の見出しが見出し番号カウンタを破壊する問題を修正
+  - 修正前: H4 以上は H3 として描画され、H3 カウンタを誤って加算（例: H1 直後の H4 で `1.0.1` のような不正な番号が出力されていた）
+  - 修正後: H4 以上はスタイルのみ H3 として描画し、番号付与とカウンタ更新の両方をスキップする
+- `OpenXmlConverter.RenderHorizontalRule`: 水平線段落に空の Run を追加
+  - Run なし段落は Word では正しく描画されるが、一部のリーダー（LibreOffice 等）で罫線が描画されない問題への対策
+- `AppLog.Write`: ファイル書き込みを `lock` で直列化
+  - `ConvertAsync` の `Task.Run`（バックグラウンドスレッド）と UI スレッドからの並行ログ書き込みで `IOException` が発生する可能性を排除
+- `UserSettings.Load`: 不正な設定値の正規化処理を追加
+  - 手動編集や過去バージョンとの非互換に備え、`HeaderMode` / `HeaderAlignment` / `FooterAlignment` / `ConversionEngine` / `BodyFontSize` の範囲外値を既定値にクランプする
+
+### リファクタリング
+
+- `WordInteropConverter`: Word VBA 定数（`wdStyleNormal=-1` 等）をマジックナンバーから名前付き `const int` に置換
+  - `WdStyleNormal` / `WdStyleListBullet` / `WdBorderBottom` / `WdLineStyleSingle` / `WdListNoNumbering` / `WdCollapseEnd` / `WdFieldPage` / `WdFieldNumPages` / `WdFormatXMLDocument`
+  - 見出しスタイルは `WdStyleHeading(level)` ヘルパー（`-(level+1)`）で算出
+
+### 対象外（このバージョンでは扱わない）
+
+- Word COM 方式と Open XML 方式の機能差異解消（順序付きリスト・`_em_` 構文・インラインコード等の差異は v0.6.0 以降で再評価）
+- 9 引数の `ConvertToDocx` シグネチャを `ConversionOptions` レコードに集約する大規模リファクタリング（テスト 9 箇所への波及があり別途実施）
+
+### 既知の制約
+
+- v0.5.4 の制約をすべて引き継ぐ
+
+---
+
 ## v0.6.0
 
 title: Open XML 方式を標準方式とする安定版候補（予定）

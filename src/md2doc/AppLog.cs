@@ -10,6 +10,10 @@ internal static class AppLog
 
     private const long MaxBytes = 1024 * 512; // 512 KB
 
+    // ConvertAsync の Task.Run（バックグラウンドスレッド）と UI スレッドの両方から
+    // ログ書き込みが発生するため、ファイル I/O を直列化する。
+    private static readonly object WriteLock = new();
+
     public static void Info(string message) => Write("INFO", message, null);
     public static void Error(string message, Exception ex) => Write("ERROR", message, ex);
 
@@ -28,8 +32,11 @@ internal static class AppLog
                 sb.AppendLine(ex.ToString());
             }
 
-            File.AppendAllText(FilePath, sb.ToString(), Encoding.UTF8);
-            TrimIfNeeded();
+            lock (WriteLock)
+            {
+                File.AppendAllText(FilePath, sb.ToString(), Encoding.UTF8);
+                TrimIfNeeded();
+            }
         }
         catch
         {
