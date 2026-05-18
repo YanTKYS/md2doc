@@ -219,8 +219,9 @@ public sealed class MainForm : Form
         bodyRow.Controls.Add(_bodyFontCombo);
         bodyRow.Controls.Add(RowLabel("サイズ(pt):", SizeLabelWidth));
         bodyRow.Controls.Add(_bodyFontSizeNumeric);
+        bodyRow.Location = new Point(8, 22);
 
-        var box = new GroupBox { Text = "文書フォント設定", Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(6) };
+        var box = new GroupBox { Text = "文書フォント設定", AutoSize = true };
         box.Controls.Add(bodyRow);
         return box;
     }
@@ -250,7 +251,7 @@ public sealed class MainForm : Form
         footerRowPanel.Controls.Add(new Label { Text = "  ", AutoSize = true });
         footerRowPanel.Controls.Add(footerAlignPanel);
 
-        var enginePanel = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        var enginePanel = new FlowLayoutPanel { AutoSize = true, WrapContents = true };
         enginePanel.Controls.Add(_engineOpenXmlRadio);
         enginePanel.Controls.Add(_engineWordComRadio);
 
@@ -271,7 +272,9 @@ public sealed class MainForm : Form
         table.Controls.Add(new Label { Text = "変換エンジン:", AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top }, 0, 3);
         table.Controls.Add(enginePanel, 1, 3);
 
-        var box = new GroupBox { Text = "オプション", Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(6) };
+        table.Location = new Point(8, 22);
+
+        var box = new GroupBox { Text = "オプション", AutoSize = true };
         box.Controls.Add(table);
         return box;
     }
