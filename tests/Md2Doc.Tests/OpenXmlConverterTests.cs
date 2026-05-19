@@ -1,3 +1,4 @@
+using Md2Doc.Core;
 using Xunit;
 
 namespace Md2Doc.Tests;

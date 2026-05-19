@@ -1,5 +1,82 @@
 # Release Notes
 
+## v0.5.7
+
+title: Open XML 方式の Core 切り出し・テスト構成整理
+
+v0.6.0 で Open XML 方式を標準方式の安定版候補へ進める前段として、変換処理を
+WinForms 本体から独立したライブラリプロジェクトへ切り出し、責務を分離する。
+新機能追加・UI 変更・Word COM 方式廃止は行わない。
+
+### 変更内容
+
+- **`src/Md2Doc.Core/` プロジェクトを追加**
+  - `TargetFramework=net8.0`、WinForms 非依存・Microsoft Word 非依存
+  - `Markdig` / `DocumentFormat.OpenXml` を参照
+- **`OpenXmlConverter` を Core プロジェクトへ移動**
+  - 名前空間: `Md2Doc` → `Md2Doc.Core`
+  - 可視性: `internal static` → `public static`（ライブラリ API として明示）
+  - 実装ロジックは変更なし
+- **WinForms 本体（`src/md2doc/`）から Open XML 関連の依存を除去**
+  - `md2doc.csproj` から `Markdig` / `DocumentFormat.OpenXml` の直接参照を削除
+    （`Md2Doc.Core` 経由で利用するため）
+  - `MainForm.cs` に `using Md2Doc.Core;` を追加
+- **テストプロジェクトを Core 参照に整理**
+  - `Md2Doc.Tests.csproj` が `Md2Doc.Core` を直接参照
+  - Open XML 方式の 26 テスト（`OpenXmlConverterTests`）は Core を対象に検証
+  - Word COM 方式テスト（`DocxConversionTests`）と `ParseBlocksTests`、
+    docx 検査ヘルパー `DocxInspector` は WinForms 本体側を引き続き参照
+- **ソリューションファイル `md2doc.sln` を追加**
+  - 3 プロジェクト（`Md2Doc.Core` / `md2doc` / `Md2Doc.Tests`）を一括ビルド可能に
+- **`build.yml` の更新**
+  - `dotnet build md2doc.sln` でソリューション全体をビルド
+  - テスト実行は `--no-build` で重複ビルドを回避
+- **`release.yml` は変更なし**
+  - `dotnet publish src/md2doc/md2doc.csproj` から `Md2Doc.Core` も
+    ProjectReference 経由で自動含有される（`PublishSingleFile=true` により
+    実行可能ファイル一本に統合される）
+
+### 責務分離後の構成
+
+| プロジェクト | 役割 | 主な依存 |
+|------------|------|---------|
+| `Md2Doc.Core` | Open XML 方式の変換処理（ライブラリ） | Markdig / DocumentFormat.OpenXml |
+| `md2doc` (WinForms) | 画面表示・入力取得・出力先指定・設定保存復元・変換方式選択・呼び出し | Md2Doc.Core / Office Interop (dynamic) |
+| `Md2Doc.Tests` | 単体・統合テスト | Md2Doc.Core / md2doc (Word COM 用) |
+
+### 維持される動作
+
+- Open XML 方式での変換（既定）
+- Word COM 方式での変換（互換確認用）
+- 変換方式選択 UI（起動時に Open XML 方式が初期選択）
+- 設定保存・復元（フォント・ヘッダー・フッター・変換エンジン等）
+- ヘッダー・フッター・ページ番号・フォント・見出し番号が Open XML 方式に反映される
+- Open XML 方式の既存テスト 26 件・Word COM 方式の統合テスト 5 件・ParseBlocksTests 8 件
+
+### Core 切り出しによる効果
+
+- **テスト容易性**: Open XML 方式のテストが WinForms / Microsoft Word いずれにも
+  依存せず、`Md2Doc.Core` 単体で検証可能
+- **保守性**: 変換処理と画面処理の責務が明確に分離され、互いに影響しにくくなる
+- **将来拡張性**: Open XML 方式のロジックが独立したアセンブリとなり、将来的に
+  他フロントエンドから参照可能（v1.1.0 以降で必要性が確認された場合）
+
+### 対象外（このバージョンでは扱わない）
+
+- Word COM 方式の廃止
+- Open XML 方式のみへの一本化
+- CLI 作成・PowerShell 簡易版作成（`docs/backlog.md` に整理済み）
+- 複数ファイルドラッグ＆ドロップ変換
+- 画像・脚注・引用ブロック対応
+- 大規模な UI 改修
+- リリース作成
+
+### 既知の制約
+
+- v0.5.6 の制約をすべて引き継ぐ
+
+---
+
 ## v0.5.5
 
 title: 潜在的バグ修正・コード整理（メンテナンスリリース）

@@ -15,6 +15,9 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <!-- Open XML 方式テストは Core を対象に検証する（WinForms 非依存）。 -->
+    <ProjectReference Include="..\..\src\Md2Doc.Core\Md2Doc.Core.csproj" />
+    <!-- Word COM 方式テスト・ParseBlocks テスト・DocxInspector は WinForms 本体側を参照する。 -->
     <ProjectReference Include="..\..\src\md2doc\md2doc.csproj" />
   </ItemGroup>
 </Project>
