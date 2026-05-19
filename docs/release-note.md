@@ -1,5 +1,59 @@
 # Release Notes
 
+## v0.6.1
+
+title: v0.6.0 レイアウト崩れの修正
+
+v0.6.0 で追加した設定サンプル表示に伴う画面レイアウト崩れを修正する。
+変換ロジック・設定サンプル生成ロジックに変更はない。
+
+### 問題
+
+- Markdown 本文入力欄が極端に潰れて表示されない
+- 設定サンプル表示欄（GroupBox）が画面の大半を占有し、入力欄を圧迫する
+- 画面サイズを変更した際に UI が崩れる
+- フォームに最小サイズが設定されていない
+
+### 原因
+
+v0.6.0 では、単一の 13 行 `TableLayoutPanel` に入力欄（`Percent,100` 行）と
+設定 GroupBox 群（すべて `AutoSize` 行）を混在させていた。
+`BuildSampleGroupBox()` が内部で `TableLayoutPanel` を使い
+絶対位置指定（`Location`）を行ったため、GroupBox の `AutoSize` 算出が
+コントロールの実サイズを反映せず、`Percent,100` 行に割り当てられるべき
+スペースが正しく計算されなかった。
+
+### 修正内容
+
+- **レイアウトを 2 段構成に変更**（`MainForm.cs`）
+  - 上部：入力セクション（`Percent,100`）— Markdown テキスト・ファイル入出力
+  - 下部：設定セクション（`AutoSize`）— フォント・オプション・サンプル・ボタン
+  - 設定セクション側の AutoSize 行が入力欄の伸縮スペースを奪わない
+- **`BuildSampleGroupBox()` を修正**
+  - 内部コンテナを `TableLayoutPanel` + 絶対位置指定 から
+    `FlowLayoutPanel (FlowDirection.TopDown)` に変更し、
+    フォント GroupBox と同一パターンに統一
+  - `_sampleTextBox.Width = 840` を明示して GroupBox の AutoSize 算出を安定化
+- **`MinimumSize = new Size(900, 750)` を設定**
+  - 画面を縮めすぎた場合に主要 UI が重なるのを防止
+- **`_markdownTextBox.MinimumSize = new Size(100, 80)` を設定**
+  - 最小高さを保証し、ウィンドウが最小サイズ近辺でも入力欄が視認可能
+- **`_sampleTextBox.Height = 100`（120 → 100）**
+  - 設定セクションの占有高さを抑制
+
+### 維持される動作
+
+- v0.6.0 のすべての機能（設定サンプル表示・変換処理）
+- 変換エンジン選択・設定保存復元
+- フォント設定・ヘッダー・フッター設定
+
+### 既知の制約
+
+- v0.6.0 の制約をすべて引き継ぐ
+- 設定サンプル表示欄の横幅は 840px 固定（ウィンドウを極端に広くしても伸長しない）
+
+---
+
 ## v0.5.7
 
 title: Open XML 方式の Core 切り出し・テスト構成整理

@@ -81,7 +81,7 @@ public sealed class MainForm : Form
     private readonly TextBox _sampleTextBox = new()
     {
         Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
-        Width = 700, Height = 120, BackColor = SystemColors.Control,
+        Height = 100, BackColor = SystemColors.Control,
     };
     private readonly Label _sampleNoteLabel = new()
     {
@@ -106,6 +106,7 @@ public sealed class MainForm : Form
         Text = "Markdown変換ツール";
         Width = 960;
         Height = 860;
+        MinimumSize = new Size(900, 750);
         Icon = AppIcon.Create();
 
         _allFonts = FontFamily.Families
@@ -114,28 +115,11 @@ public sealed class MainForm : Form
             .ToArray();
 
         _bodyFontCombo = CreateFontComboBox("MS Gothic");
+        // Markdown入力欄が過度に潰れないよう最小サイズを保証する
+        _markdownTextBox.MinimumSize = new Size(100, 80);
 
-        var root = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 13,
-            Padding = new Padding(10),
-        };
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 入力方式 label
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // inputModePanel
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // Markdown本文 label + clearButton
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // markdownTextBox
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 入力ファイル label
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // inputFilePanel
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 出力ファイル label
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // outputPanel
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // fontGroupBox
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // optionsGroupBox
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // sampleGroupBox
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // ボタン行
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // resultLabel
-
+        // ── 入力セクション（上部・伸縮可能）──────────────────────────────
+        // 設定セクションと分離することで Percent 行が確実にスペースを確保できる
         var inputModePanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
         inputModePanel.Controls.Add(_textInputRadio);
         inputModePanel.Controls.Add(_fileInputRadio);
@@ -156,24 +140,65 @@ public sealed class MainForm : Form
         outputPanel.Controls.Add(_outputFilePathTextBox, 0, 0);
         outputPanel.Controls.Add(_outputBrowseButton, 1, 0);
 
+        var inputSection = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 8,
+        };
+        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 入力方式 label
+        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // inputModePanel
+        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // Markdown本文 label + clearButton
+        inputSection.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // markdownTextBox
+        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 入力ファイル label
+        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // inputFilePanel
+        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 出力ファイル label
+        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // outputPanel
+        inputSection.Controls.Add(new Label { Text = "入力方式", AutoSize = true });
+        inputSection.Controls.Add(inputModePanel);
+        inputSection.Controls.Add(mdLabelPanel);
+        inputSection.Controls.Add(_markdownTextBox);
+        inputSection.Controls.Add(new Label { Text = "入力ファイル（ファイル入力）", AutoSize = true });
+        inputSection.Controls.Add(inputFilePanel);
+        inputSection.Controls.Add(new Label { Text = "出力ファイル（.docx）", AutoSize = true });
+        inputSection.Controls.Add(outputPanel);
+
+        // ── 設定セクション（下部・高さ固定）──────────────────────────────
         var buttonPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
         buttonPanel.Controls.Add(_convertButton);
         buttonPanel.Controls.Add(_openFileButton);
         buttonPanel.Controls.Add(_openFolderButton);
 
-        root.Controls.Add(new Label { Text = "入力方式", AutoSize = true });
-        root.Controls.Add(inputModePanel);
-        root.Controls.Add(mdLabelPanel);
-        root.Controls.Add(_markdownTextBox);
-        root.Controls.Add(new Label { Text = "入力ファイル（ファイル入力）", AutoSize = true });
-        root.Controls.Add(inputFilePanel);
-        root.Controls.Add(new Label { Text = "出力ファイル（.docx）", AutoSize = true });
-        root.Controls.Add(outputPanel);
-        root.Controls.Add(BuildFontGroupBox());
-        root.Controls.Add(BuildOptionsGroupBox());
-        root.Controls.Add(BuildSampleGroupBox());
-        root.Controls.Add(buttonPanel);
-        root.Controls.Add(_resultLabel);
+        var settingsSection = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 5,
+            AutoSize = true,
+        };
+        settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // fontGroupBox
+        settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // optionsGroupBox
+        settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // sampleGroupBox
+        settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // buttonPanel
+        settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // resultLabel
+        settingsSection.Controls.Add(BuildFontGroupBox());
+        settingsSection.Controls.Add(BuildOptionsGroupBox());
+        settingsSection.Controls.Add(BuildSampleGroupBox());
+        settingsSection.Controls.Add(buttonPanel);
+        settingsSection.Controls.Add(_resultLabel);
+
+        // ── ルートレイアウト（入力上部・設定下部の2段構成）────────────────
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(10),
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));  // 入力セクション（伸縮）
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // 設定セクション（固定）
+        root.Controls.Add(inputSection);
+        root.Controls.Add(settingsSection);
 
         Controls.Add(root);
 
@@ -298,17 +323,24 @@ public sealed class MainForm : Form
 
     private GroupBox BuildSampleGroupBox()
     {
-        var inner = new TableLayoutPanel { ColumnCount = 1, RowCount = 3, AutoSize = true };
-        inner.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        inner.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        inner.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        inner.Controls.Add(_sampleUpdateButton, 0, 0);
-        inner.Controls.Add(_sampleTextBox, 0, 1);
-        inner.Controls.Add(_sampleNoteLabel, 0, 2);
-        inner.Location = new Point(8, 22);
+        // FlowLayoutPanel (TopDown) で font GroupBox と同じパターンを踏襲する。
+        // TextBox に Width を設定することで GroupBox の AutoSize 算出が正確になる。
+        _sampleTextBox.Width = 840;
+
+        var panel = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            Margin = Padding.Empty,
+        };
+        panel.Controls.Add(_sampleUpdateButton);
+        panel.Controls.Add(_sampleTextBox);
+        panel.Controls.Add(_sampleNoteLabel);
+        panel.Location = new Point(8, 22);
 
         var box = new GroupBox { Text = "設定サンプル表示", AutoSize = true };
-        box.Controls.Add(inner);
+        box.Controls.Add(panel);
         return box;
     }
 
