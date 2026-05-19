@@ -114,11 +114,28 @@ dotnet test tests/Md2Doc.Tests/Md2Doc.Tests.csproj
 | v0.6.x | 配布前検証・受入テスト・運用整備フェーズ |
 | v1.0.0 | 庁内配布可能版（目標） |
 
-現在のバージョン: **v0.5.6**（Open XML方式を標準前提としたドキュメント整理）
+現在のバージョン: **v0.5.7**（Open XML 方式の Core プロジェクト切り出し）
 
 更新履歴は `docs/release-note.md` を参照してください。
 
-## 13. 標準成果物と配置
+## 13. プロジェクト構成
+
+v0.5.7 で変換処理と画面処理の責務を分離しました。
+
+| プロジェクト | 役割 | TargetFramework |
+|------------|------|----------------|
+| `src/Md2Doc.Core/` | Open XML 方式の変換処理（ライブラリ） | `net8.0` |
+| `src/md2doc/` | WinForms 本体（画面・設定・呼び出し） | `net8.0-windows` |
+| `tests/Md2Doc.Tests/` | xUnit テストプロジェクト | `net8.0-windows` |
+
+ソリューションファイル `md2doc.sln` で 3 プロジェクトを一括ビルドできます。
+
+```bash
+dotnet build md2doc.sln
+dotnet test tests/Md2Doc.Tests/Md2Doc.Tests.csproj
+```
+
+## 14. 標準成果物と配置
 
 本リポジトリは `reference/guide_context.md` の標準成果物に沿って、以下を配置しています。
 
@@ -131,8 +148,11 @@ dotnet test tests/Md2Doc.Tests/Md2Doc.Tests.csproj
 - `docs/engine-comparison.md`
 - `docs/poc-openxml.md`
 - `docs/operation_handover.md`
+- `docs/backlog.md`
 - `manuals/admin_manual.md`
 - `manuals/operator_manual.md`
 - `manuals/user_manual.md`
-- `src/md2doc/`（C# WinForms 実装）
+- `src/Md2Doc.Core/`（Open XML 方式ライブラリ）
+- `src/md2doc/`（WinForms 本体）
 - `tests/Md2Doc.Tests/`（xUnit テストプロジェクト）
+- `md2doc.sln`（ソリューションファイル）

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Drawing;
 using System.Text;
+using Md2Doc.Core;
 
 namespace Md2Doc;
 

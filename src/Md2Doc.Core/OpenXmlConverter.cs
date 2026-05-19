@@ -12,13 +12,15 @@ using MdTable = Markdig.Extensions.Tables.Table;
 using MdTableRow = Markdig.Extensions.Tables.TableRow;
 using MdTableCell = Markdig.Extensions.Tables.TableCell;
 
-namespace Md2Doc;
+namespace Md2Doc.Core;
 
 /// <summary>
-/// Markdig + Open XML SDK による Markdown → docx 変換クラス（v0.5.2）。
-/// Microsoft Word 不要。WordInteropConverter と共存する本実装候補クラス。
+/// Markdig + Open XML SDK による Markdown → docx 変換クラス（v0.5.2 で本実装候補化、
+/// v0.5.7 で Md2Doc.Core プロジェクトへ切り出し）。
+/// Microsoft Word 不要・WinForms 非依存。WinForms 本体・テスト・将来の他フロントエンドから
+/// 共通の API として利用する。
 /// </summary>
-internal static class OpenXmlConverter
+public static class OpenXmlConverter
 {
     private static readonly Regex PageBreakPattern = new(
         @"^(<!--\s*pagebreak\s*-->|---pagebreak---)$",
