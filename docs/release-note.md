@@ -1,5 +1,37 @@
 # Release Notes
 
+## v0.6.2
+
+title: 設定サンプル表示機能の削除
+
+v0.6.0 で追加した設定サンプル表示は、変換後の Word 文書の見え方を再現するものではなく、
+ヘッダー・フッター・見出し番号の部品表示に留まるものであった。
+実機確認の結果、UX 上の価値が低いと判断し、機能ごと削除する。
+変換後は「Wordファイルを開く」ボタンから Word で直接確認する導線を優先する。
+
+### 変更内容
+
+- **`src/md2doc/MainForm.cs`**
+  - 設定サンプル表示 GroupBox を削除（`BuildSampleGroupBox()`・`UpdateSample()` メソッド削除）
+  - `_sampleUpdateButton` / `_sampleTextBox` / `_sampleNoteLabel` フィールドを削除
+  - `_sampleUpdateButton.Click` イベントハンドラを削除
+  - 設定セクションを 5 行 → 4 行に縮小（sampleGroupBox 行の除去）
+- **`src/Md2Doc.Core/SettingsSampleBuilder.cs` を削除**
+- **`tests/Md2Doc.Tests/SettingsSampleBuilderTests.cs` を削除**
+
+### 維持される動作
+
+- Open XML 方式・Word COM 方式の変換処理
+- フォント・ヘッダー・フッター・見出し番号設定
+- 変換後の「Wordファイルを開く」「保存先フォルダを開く」ボタン
+- v0.6.1 のレイアウト修正（2 段構成・`MinimumSize`）
+
+### 既知の制約
+
+- v0.6.1 の制約をすべて引き継ぐ
+
+---
+
 ## v0.6.1
 
 title: v0.6.0 レイアウト崩れの修正
