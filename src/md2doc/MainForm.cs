@@ -76,19 +76,6 @@ public sealed class MainForm : Form
         AutoSize = true,
     };
 
-    // 設定サンプル表示
-    private readonly Button _sampleUpdateButton = new() { Text = "サンプル更新", AutoSize = true };
-    private readonly TextBox _sampleTextBox = new()
-    {
-        Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical,
-        Height = 100, BackColor = SystemColors.Control,
-    };
-    private readonly Label _sampleNoteLabel = new()
-    {
-        Text = "※この表示は設定確認用のサンプルです。実際のWord出力とは完全には一致しません。",
-        AutoSize = true,
-    };
-
     // 実行・変換後アクション・結果
     private readonly Button _convertButton = new() { Text = "変換実行", AutoSize = true };
     private readonly Button _openFileButton = new() { Text = "Wordファイルを開く", AutoSize = true, Enabled = false };
@@ -173,17 +160,15 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 5,
+            RowCount = 4,
             AutoSize = true,
         };
         settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // fontGroupBox
         settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // optionsGroupBox
-        settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // sampleGroupBox
         settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // buttonPanel
         settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // resultLabel
         settingsSection.Controls.Add(BuildFontGroupBox());
         settingsSection.Controls.Add(BuildOptionsGroupBox());
-        settingsSection.Controls.Add(BuildSampleGroupBox());
         settingsSection.Controls.Add(buttonPanel);
         settingsSection.Controls.Add(_resultLabel);
 
@@ -219,7 +204,6 @@ public sealed class MainForm : Form
         _headerFileNameRadio.CheckedChanged += (_, _) => { if (_headerFileNameRadio.Checked) RefreshHeaderMode(); };
         _headerCustomRadio.CheckedChanged += (_, _) => { if (_headerCustomRadio.Checked) RefreshHeaderMode(); };
         _bodyRecentFontCombo.SelectedIndexChanged += (_, _) => SyncRecentToMain(_bodyRecentFontCombo, _bodyFontCombo);
-        _sampleUpdateButton.Click += (_, _) => UpdateSample();
         _openFileButton.Click += (_, _) => OpenLastOutputFile();
         _openFolderButton.Click += (_, _) => OpenLastOutputFolder();
         _convertButton.Click += async (_, _) => await ConvertAsync();
@@ -319,44 +303,6 @@ public sealed class MainForm : Form
         var box = new GroupBox { Text = "オプション", AutoSize = true };
         box.Controls.Add(table);
         return box;
-    }
-
-    private GroupBox BuildSampleGroupBox()
-    {
-        // FlowLayoutPanel (TopDown) で font GroupBox と同じパターンを踏襲する。
-        // TextBox に Width を設定することで GroupBox の AutoSize 算出が正確になる。
-        _sampleTextBox.Width = 840;
-
-        var panel = new FlowLayoutPanel
-        {
-            AutoSize = true,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
-            Margin = Padding.Empty,
-        };
-        panel.Controls.Add(_sampleUpdateButton);
-        panel.Controls.Add(_sampleTextBox);
-        panel.Controls.Add(_sampleNoteLabel);
-        panel.Location = new Point(8, 22);
-
-        var box = new GroupBox { Text = "設定サンプル表示", AutoSize = true };
-        box.Controls.Add(panel);
-        return box;
-    }
-
-    private void UpdateSample()
-    {
-        var headerMode = _headerNoneRadio.Checked ? 0 : _headerFileNameRadio.Checked ? 1 : 2;
-        var inputFileName = _fileInputRadio.Checked
-            ? Path.GetFileName(_inputFilePathTextBox.Text.Trim())
-            : null;
-        _sampleTextBox.Text = SettingsSampleBuilder.Build(
-            headerMode,
-            _headerCustomTextBox.Text,
-            inputFileName,
-            GetSelectedAlignment(_headerAlignLeftRadio, _headerAlignCenterRadio),
-            _headingNumberCheck.Checked,
-            _footerPageNumberCheck.Checked);
     }
 
     private ComboBox CreateFontComboBox(string defaultFont)
