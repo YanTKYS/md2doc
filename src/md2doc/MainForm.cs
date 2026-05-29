@@ -240,11 +240,22 @@ public sealed class MainForm : Form
             AutoSize = false, TextAlign = ContentAlignment.MiddleLeft,
         };
 
-        var bodyRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
-        bodyRow.Controls.Add(_bodyRecentFontCombo);
-        bodyRow.Controls.Add(_bodyFontCombo);
-        bodyRow.Controls.Add(RowLabel("サイズ(pt):", SizeLabelWidth));
-        bodyRow.Controls.Add(_bodyFontSizeNumeric);
+        // FlowLayoutPanel ではなく TableLayoutPanel を使う。
+        // FlowLayoutPanel は GroupBox の AutoSize 算出より前に計測されると
+        // レイアウト前の初期サイズを返すため、GroupBox が過大になる。
+        // TableLayoutPanel は AutoSize を正確に算出できる（options GroupBox と同じ構造）。
+        var bodyRow = new TableLayoutPanel
+        {
+            ColumnCount = 4, RowCount = 1, AutoSize = true, Margin = Padding.Empty,
+        };
+        bodyRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        bodyRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        bodyRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        bodyRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        bodyRow.Controls.Add(_bodyRecentFontCombo, 0, 0);
+        bodyRow.Controls.Add(_bodyFontCombo, 1, 0);
+        bodyRow.Controls.Add(RowLabel("サイズ(pt):", SizeLabelWidth), 2, 0);
+        bodyRow.Controls.Add(_bodyFontSizeNumeric, 3, 0);
         bodyRow.Location = new Point(8, 22);
 
         var box = new GroupBox { Text = "文書フォント設定", AutoSize = true };
