@@ -72,7 +72,7 @@ public sealed class MainForm : Form
     };
     private readonly RadioButton _engineWordComRadio = new()
     {
-        Text = "Word COM方式（互換確認用）",
+        Text = "Word COM方式（Word必須・互換確認用）",
         AutoSize = true,
     };
 
