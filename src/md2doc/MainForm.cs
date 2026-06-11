@@ -66,18 +66,24 @@ public sealed class MainForm : Form
     // 変換エンジン選択（既定: Open XML方式）
     private readonly RadioButton _engineOpenXmlRadio = new()
     {
-        Text = "Open XML方式（Word不要・標準候補）",
+        Text = "Open XML方式（標準・高速）",
         Checked = true,
         AutoSize = true,
     };
     private readonly RadioButton _engineWordComRadio = new()
     {
-        Text = "Word COM方式（互換確認用・Microsoft Word必要）",
+        Text = "Word COM方式（互換確認用）",
         AutoSize = true,
     };
 
     // 実行・変換後アクション・結果
-    private readonly Button _convertButton = new() { Text = "変換実行", AutoSize = true };
+    private readonly Button _convertButton = new()
+    {
+        Text = "変換実行",
+        AutoSize = false,
+        MinimumSize = new Size(110, 34),
+        Padding = new Padding(12, 0, 12, 0),
+    };
     private readonly Button _openFileButton = new() { Text = "Wordファイルを開く", AutoSize = true, Enabled = false };
     private readonly Button _openFolderButton = new() { Text = "保存先フォルダを開く", AutoSize = true, Enabled = false };
     private readonly Label _resultLabel = new() { AutoSize = true };
@@ -102,12 +108,12 @@ public sealed class MainForm : Form
             .ToArray();
 
         _bodyFontCombo = CreateFontComboBox("MS Gothic");
-        // Markdown入力欄が過度に潰れないよう最小サイズを保証する
         _markdownTextBox.MinimumSize = new Size(100, 80);
+        _convertButton.Font = new Font(Font, FontStyle.Bold);
 
         // ── 入力セクション（上部・伸縮可能）──────────────────────────────
-        // 設定セクションと分離することで Percent 行が確実にスペースを確保できる
         var inputModePanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
+        inputModePanel.Controls.Add(new Label { Text = "入力方式:", AutoSize = true, Margin = new Padding(0, 4, 6, 0) });
         inputModePanel.Controls.Add(_textInputRadio);
         inputModePanel.Controls.Add(_fileInputRadio);
 
@@ -131,17 +137,15 @@ public sealed class MainForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 8,
+            RowCount = 7,
         };
-        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 入力方式 label
-        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // inputModePanel
+        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // inputModePanel（入力方式ラベル含む）
         inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // Markdown本文 label + clearButton
         inputSection.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // markdownTextBox
         inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 入力ファイル label
         inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // inputFilePanel
         inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 出力ファイル label
         inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // outputPanel
-        inputSection.Controls.Add(new Label { Text = "入力方式", AutoSize = true });
         inputSection.Controls.Add(inputModePanel);
         inputSection.Controls.Add(mdLabelPanel);
         inputSection.Controls.Add(_markdownTextBox);
@@ -156,19 +160,24 @@ public sealed class MainForm : Form
         buttonPanel.Controls.Add(_openFileButton);
         buttonPanel.Controls.Add(_openFolderButton);
 
+        _resultLabel.Margin = new Padding(0, 4, 0, 0);
+
         var settingsSection = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4,
+            RowCount = 5,
             AutoSize = true,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
+            Margin = new Padding(0, 6, 0, 0),
         };
         settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // fontGroupBox
         settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // optionsGroupBox
+        settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // engineGroupBox
         settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // buttonPanel
         settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // resultLabel
         settingsSection.Controls.Add(BuildFontGroupBox());
         settingsSection.Controls.Add(BuildOptionsGroupBox());
+        settingsSection.Controls.Add(BuildEngineGroupBox());
         settingsSection.Controls.Add(buttonPanel);
         settingsSection.Controls.Add(_resultLabel);
 
@@ -178,7 +187,7 @@ public sealed class MainForm : Form
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 2,
-            Padding = new Padding(10),
+            Padding = new Padding(12),
         };
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));  // 入力セクション（伸縮）
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // 設定セクション（固定）
@@ -258,7 +267,7 @@ public sealed class MainForm : Form
         bodyRow.Controls.Add(_bodyFontSizeNumeric, 3, 0);
         bodyRow.Location = new Point(8, 22);
 
-        var box = new GroupBox { Text = "文書フォント設定", AutoSize = true };
+        var box = new GroupBox { Text = "フォント設定", AutoSize = true };
         box.Controls.Add(bodyRow);
         return box;
     }
@@ -288,14 +297,9 @@ public sealed class MainForm : Form
         footerRowPanel.Controls.Add(new Label { Text = "  ", AutoSize = true });
         footerRowPanel.Controls.Add(footerAlignPanel);
 
-        var enginePanel = new FlowLayoutPanel { AutoSize = true, WrapContents = true };
-        enginePanel.Controls.Add(_engineOpenXmlRadio);
-        enginePanel.Controls.Add(_engineWordComRadio);
-
-        var table = new TableLayoutPanel { ColumnCount = 2, RowCount = 4, AutoSize = true };
+        var table = new TableLayoutPanel { ColumnCount = 2, RowCount = 3, AutoSize = true };
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -306,12 +310,25 @@ public sealed class MainForm : Form
         table.Controls.Add(headerRowPanel, 1, 1);
         table.Controls.Add(new Label { Text = "フッター:", AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top }, 0, 2);
         table.Controls.Add(footerRowPanel, 1, 2);
-        table.Controls.Add(new Label { Text = "変換エンジン:", AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top }, 0, 3);
-        table.Controls.Add(enginePanel, 1, 3);
 
         table.Location = new Point(8, 22);
 
-        var box = new GroupBox { Text = "オプション", AutoSize = true };
+        var box = new GroupBox { Text = "文書オプション", AutoSize = true };
+        box.Controls.Add(table);
+        return box;
+    }
+
+    private GroupBox BuildEngineGroupBox()
+    {
+        var table = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, AutoSize = true };
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        table.Controls.Add(_engineOpenXmlRadio, 0, 0);
+        table.Controls.Add(_engineWordComRadio, 1, 0);
+        table.Location = new Point(8, 22);
+
+        var box = new GroupBox { Text = "変換エンジン", AutoSize = true };
         box.Controls.Add(table);
         return box;
     }
