@@ -99,7 +99,7 @@ public sealed class MainForm : Form
         Text = "Markdown変換ツール";
         Width = 960;
         Height = 860;
-        MinimumSize = new Size(900, 750);
+        MinimumSize = new Size(760, 580);
         Icon = AppIcon.Create();
 
         _allFonts = FontFamily.Families
@@ -170,6 +170,7 @@ public sealed class MainForm : Form
             Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
             Margin = new Padding(0, 6, 0, 0),
         };
+        settingsSection.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // fontGroupBox
         settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // optionsGroupBox
         settingsSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // engineGroupBox
@@ -249,25 +250,21 @@ public sealed class MainForm : Form
             AutoSize = false, TextAlign = ContentAlignment.MiddleLeft,
         };
 
-        // FlowLayoutPanel ではなく TableLayoutPanel を使う。
-        // FlowLayoutPanel は GroupBox の AutoSize 算出より前に計測されると
-        // レイアウト前の初期サイズを返すため、GroupBox が過大になる。
-        // TableLayoutPanel は AutoSize を正確に算出できる（options GroupBox と同じ構造）。
         var bodyRow = new TableLayoutPanel
         {
-            ColumnCount = 4, RowCount = 1, AutoSize = true, Margin = Padding.Empty,
+            ColumnCount = 4, RowCount = 1, AutoSize = true, Dock = DockStyle.Fill, Margin = Padding.Empty,
         };
         bodyRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         bodyRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         bodyRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         bodyRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        bodyRow.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         bodyRow.Controls.Add(_bodyRecentFontCombo, 0, 0);
         bodyRow.Controls.Add(_bodyFontCombo, 1, 0);
         bodyRow.Controls.Add(RowLabel("サイズ(pt):", SizeLabelWidth), 2, 0);
         bodyRow.Controls.Add(_bodyFontSizeNumeric, 3, 0);
-        bodyRow.Location = new Point(8, 22);
 
-        var box = new GroupBox { Text = "フォント設定", AutoSize = true };
+        var box = new GroupBox { Text = "フォント設定", AutoSize = true, Padding = new Padding(6, 2, 6, 6) };
         box.Controls.Add(bodyRow);
         return box;
     }
@@ -297,7 +294,7 @@ public sealed class MainForm : Form
         footerRowPanel.Controls.Add(new Label { Text = "  ", AutoSize = true });
         footerRowPanel.Controls.Add(footerAlignPanel);
 
-        var table = new TableLayoutPanel { ColumnCount = 2, RowCount = 3, AutoSize = true };
+        var table = new TableLayoutPanel { ColumnCount = 2, RowCount = 3, AutoSize = true, Dock = DockStyle.Fill };
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -311,24 +308,21 @@ public sealed class MainForm : Form
         table.Controls.Add(new Label { Text = "フッター:", AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top }, 0, 2);
         table.Controls.Add(footerRowPanel, 1, 2);
 
-        table.Location = new Point(8, 22);
-
-        var box = new GroupBox { Text = "文書オプション", AutoSize = true };
+        var box = new GroupBox { Text = "文書オプション", AutoSize = true, Padding = new Padding(6, 2, 6, 6) };
         box.Controls.Add(table);
         return box;
     }
 
     private GroupBox BuildEngineGroupBox()
     {
-        var table = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, AutoSize = true };
+        var table = new TableLayoutPanel { ColumnCount = 2, RowCount = 1, AutoSize = true, Dock = DockStyle.Fill };
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         table.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         table.Controls.Add(_engineOpenXmlRadio, 0, 0);
         table.Controls.Add(_engineWordComRadio, 1, 0);
-        table.Location = new Point(8, 22);
 
-        var box = new GroupBox { Text = "変換エンジン", AutoSize = true };
+        var box = new GroupBox { Text = "変換エンジン", AutoSize = true, Padding = new Padding(6, 2, 6, 6) };
         box.Controls.Add(table);
         return box;
     }
