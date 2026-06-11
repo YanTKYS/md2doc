@@ -114,7 +114,7 @@ dotnet test tests/Md2Doc.Tests/Md2Doc.Tests.csproj
 | v0.6.x | 機能追加・配布前検証・受入テスト・運用整備フェーズ |
 | v1.0.0 | 庁内配布可能版（目標） |
 
-現在のバージョン: **v0.7.0**（WinForms 画面の UI/UX 整備・庁内配布準備）
+現在のバージョン: **v0.7.1**（GroupBox 余白修正・MinimumSize 適正化）
 
 更新履歴は `docs/release-note.md` を参照してください。
 
