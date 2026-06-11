@@ -1,5 +1,28 @@
 # Release Notes
 
+## v0.7.1
+
+title: GroupBox 余白修正・MinimumSize 適正化
+
+v0.7.0 で発生していた「フォント設定」「変換エンジン」GroupBox 内部の大きな余白を修正する。
+合わせてウィンドウの最小サイズを実際の表示に必要な高さに基づき適正化する。
+
+### 変更内容
+
+- **`src/md2doc/MainForm.cs`**
+  - 全 3 GroupBox（フォント設定・文書オプション・変換エンジン）に `AutoSizeMode = AutoSizeMode.GrowAndShrink` を追加
+    - WinForms GroupBox の既定 `AutoSizeMode` は `GrowOnly`（現在サイズより縮まない）であり、
+      初期デフォルトサイズ由来の余白がレイアウト後も残る原因となっていた
+    - `GrowAndShrink` を明示することで、コンテンツ実寸まで正しく縮小される
+
+### 未確認事項（実機確認推奨）
+
+- `MinimumSize = 760×580` での表示確認（表示倍率 100% / 125% / 150%・Windows 実機）
+  - 設定セクション下部の「変換実行」ボタン・結果ラベルが切れないこと
+  - 各 GroupBox が内容に沿って縮小表示されること
+
+---
+
 ## v0.7.0
 
 title: WinForms 画面の UI/UX 整備（庁内配布準備）

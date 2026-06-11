@@ -264,7 +264,7 @@ public sealed class MainForm : Form
         bodyRow.Controls.Add(RowLabel("サイズ(pt):", SizeLabelWidth), 2, 0);
         bodyRow.Controls.Add(_bodyFontSizeNumeric, 3, 0);
 
-        var box = new GroupBox { Text = "フォント設定", AutoSize = true, Padding = new Padding(6, 2, 6, 6) };
+        var box = new GroupBox { Text = "フォント設定", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(6, 2, 6, 6) };
         box.Controls.Add(bodyRow);
         return box;
     }
@@ -308,7 +308,7 @@ public sealed class MainForm : Form
         table.Controls.Add(new Label { Text = "フッター:", AutoSize = true, Anchor = AnchorStyles.Left | AnchorStyles.Top }, 0, 2);
         table.Controls.Add(footerRowPanel, 1, 2);
 
-        var box = new GroupBox { Text = "文書オプション", AutoSize = true, Padding = new Padding(6, 2, 6, 6) };
+        var box = new GroupBox { Text = "文書オプション", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(6, 2, 6, 6) };
         box.Controls.Add(table);
         return box;
     }
@@ -322,7 +322,7 @@ public sealed class MainForm : Form
         table.Controls.Add(_engineOpenXmlRadio, 0, 0);
         table.Controls.Add(_engineWordComRadio, 1, 0);
 
-        var box = new GroupBox { Text = "変換エンジン", AutoSize = true, Padding = new Padding(6, 2, 6, 6) };
+        var box = new GroupBox { Text = "変換エンジン", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(6, 2, 6, 6) };
         box.Controls.Add(table);
         return box;
     }
