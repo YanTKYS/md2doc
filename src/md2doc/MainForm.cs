@@ -99,7 +99,7 @@ public sealed class MainForm : Form
         Text = "Markdown変換ツール";
         Width = 960;
         Height = 860;
-        MinimumSize = new Size(760, 580);
+        MinimumSize = new Size(760, 640);
         Icon = AppIcon.Create();
 
         _allFonts = FontFamily.Families
