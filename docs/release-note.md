@@ -2,10 +2,11 @@
 
 ## v0.7.1
 
-title: GroupBox 余白修正・MinimumSize 適正化
+title: GroupBox 余白修正・レイアウト構造の恒久修正
 
-v0.7.0 で発生していた「フォント設定」「変換エンジン」GroupBox 内部の大きな余白を修正する。
-合わせてウィンドウの最小サイズを実際の表示に必要な高さに基づき適正化する。
+v0.7.0 で発生していた GroupBox 内部の大きな余白を修正する。
+また、ウィンドウ縮小時にファイルパス行が見切れる問題を、MinimumSize の調整ではなく
+レイアウト構造の見直しにより恒久的に解決する。
 
 ### 変更内容
 
@@ -14,10 +15,13 @@ v0.7.0 で発生していた「フォント設定」「変換エンジン」Grou
     - WinForms GroupBox の既定 `AutoSizeMode` は `GrowOnly`（現在サイズより縮まない）であり、
       初期デフォルトサイズ由来の余白がレイアウト後も残る原因となっていた
     - `GrowAndShrink` を明示することで、コンテンツ実寸まで正しく縮小される
-  - `MinimumSize` を `760×580` → `760×640` に修正
-    - inputSection の最小高さ（~250px）と settingsSection の高さ（~296px）から
-      必要クライアント高さを ~570px と算出。580px では境界値となり実機で溢れが確認されたため
-      60px の余裕を持たせた値に修正する
+  - root レイアウトを 2 段 → **3 段**に変更し、ファイルパス行を専用の `ioSection` へ切り出し
+    - 旧: `inputSection (Percent)` / `settingsSection (AutoSize)`
+    - 新: `inputSection (Percent)` / `ioSection (AutoSize)` / `settingsSection (AutoSize)`
+    - 根本原因: `Percent,100` 行の**下に** AutoSize 行があると、ウィンドウ縮小時に
+      下の行が押し出されて見切れる。Percent 行を inputSection の**最終行**にすることで
+      構造的に再発を防ぐ
+  - `MinimumSize` を `760×580` → `760×600` に修正（新構造での実測値に基づく）
 
 ---
 

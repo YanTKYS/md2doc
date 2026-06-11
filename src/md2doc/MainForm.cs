@@ -99,7 +99,7 @@ public sealed class MainForm : Form
         Text = "Markdown変換ツール";
         Width = 960;
         Height = 860;
-        MinimumSize = new Size(760, 640);
+        MinimumSize = new Size(760, 600);
         Icon = AppIcon.Create();
 
         _allFonts = FontFamily.Families
@@ -111,7 +111,8 @@ public sealed class MainForm : Form
         _markdownTextBox.MinimumSize = new Size(100, 80);
         _convertButton.Font = new Font(Font, FontStyle.Bold);
 
-        // ── 入力セクション（上部・伸縮可能）──────────────────────────────
+        // ── 入力セクション（Markdown テキスト・伸縮可能）─────────────────────
+        // Percent,100 行を最終行にすることで、AutoSize 行が押し出されない構造を保証する。
         var inputModePanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
         inputModePanel.Controls.Add(new Label { Text = "入力方式:", AutoSize = true, Margin = new Padding(0, 4, 6, 0) });
         inputModePanel.Controls.Add(_textInputRadio);
@@ -121,6 +122,21 @@ public sealed class MainForm : Form
         mdLabelPanel.Controls.Add(new Label { Text = "Markdown本文（テキスト入力）", AutoSize = true });
         mdLabelPanel.Controls.Add(_clearButton);
 
+        var inputSection = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+        };
+        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // inputModePanel
+        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // mdLabelPanel
+        inputSection.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // markdownTextBox（最終行）
+        inputSection.Controls.Add(inputModePanel);
+        inputSection.Controls.Add(mdLabelPanel);
+        inputSection.Controls.Add(_markdownTextBox);
+
+        // ── ファイル入出力セクション（常に表示・AutoSize）─────────────────────
+        // root の AutoSize 行に配置することで、Markdown 伸縮の影響を受けない。
         var inputFilePanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, AutoSize = true };
         inputFilePanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         inputFilePanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -133,26 +149,22 @@ public sealed class MainForm : Form
         outputPanel.Controls.Add(_outputFilePathTextBox, 0, 0);
         outputPanel.Controls.Add(_outputBrowseButton, 1, 0);
 
-        var inputSection = new TableLayoutPanel
+        var ioSection = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 7,
+            RowCount = 4,
+            AutoSize = true,
+            Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top,
         };
-        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // inputModePanel（入力方式ラベル含む）
-        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // Markdown本文 label + clearButton
-        inputSection.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // markdownTextBox
-        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 入力ファイル label
-        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // inputFilePanel
-        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // 出力ファイル label
-        inputSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));      // outputPanel
-        inputSection.Controls.Add(inputModePanel);
-        inputSection.Controls.Add(mdLabelPanel);
-        inputSection.Controls.Add(_markdownTextBox);
-        inputSection.Controls.Add(new Label { Text = "入力ファイル（ファイル入力）", AutoSize = true });
-        inputSection.Controls.Add(inputFilePanel);
-        inputSection.Controls.Add(new Label { Text = "出力ファイル（.docx）", AutoSize = true });
-        inputSection.Controls.Add(outputPanel);
+        ioSection.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        ioSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // 入力ファイルlabel
+        ioSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // inputFilePanel
+        ioSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // 出力ファイルlabel
+        ioSection.RowStyles.Add(new RowStyle(SizeType.AutoSize));  // outputPanel
+        ioSection.Controls.Add(new Label { Text = "入力ファイル（ファイル入力）", AutoSize = true });
+        ioSection.Controls.Add(inputFilePanel);
+        ioSection.Controls.Add(new Label { Text = "出力ファイル（.docx）", AutoSize = true });
+        ioSection.Controls.Add(outputPanel);
 
         // ── 設定セクション（下部・高さ固定）──────────────────────────────
         var buttonPanel = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
@@ -182,17 +194,22 @@ public sealed class MainForm : Form
         settingsSection.Controls.Add(buttonPanel);
         settingsSection.Controls.Add(_resultLabel);
 
-        // ── ルートレイアウト（入力上部・設定下部の2段構成）────────────────
+        // ── ルートレイアウト（3段構成）───────────────────────────────────
+        // Row 0 (Percent): Markdown テキスト入力（伸縮可・Percent 行が最終行）
+        // Row 1 (AutoSize): ファイル入出力パス（常に表示）
+        // Row 2 (AutoSize): 各種設定・実行ボタン（常に表示）
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 2,
+            RowCount = 3,
             Padding = new Padding(12),
         };
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));  // 入力セクション（伸縮）
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // 設定セクション（固定）
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));  // inputSection（伸縮）
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // ioSection（常時表示）
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));       // settingsSection（常時表示）
         root.Controls.Add(inputSection);
+        root.Controls.Add(ioSection);
         root.Controls.Add(settingsSection);
 
         Controls.Add(root);
